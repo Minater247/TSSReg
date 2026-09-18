@@ -1,0 +1,9 @@
+{
+  "name": "tssreg",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome/Firefox extension fixing UCSD TSS quirks",
+  "scripts": {
+    "build": "node build.js"
+  }
+}

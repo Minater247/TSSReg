@@ -1,0 +1,105 @@
+<!--
+Source: https://tss.ucsd.edu/sap/opu/odata/ITUS/PR_MY_MODULES_V2_SRV/ModuleHeaderSet(SmObjid='00009462',SmOtype='SM',ScObjid='00000257',ModregId=guid'25219bb5-97e6-1fd1-a1e6-43710c4e1290',EventPackageId='00154645',AcademicYear='2026',AcademicSession='002')/Event?sap-client=500
+Captured 2026-09-15. Real response for CSE-123 (Computer Networks), Fall 2026/2027.
+Key finding: RoomShort carries the actual WebReg-style building+room code
+("CENTR 115", "WLH 2005") that the TSS UI never displays -- it only shows
+LocationStext ("UC San Diego") and RoomStext ("Room 115 - Lecture Hall"),
+neither of which names the building.
+-->
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xml:base="https://tss.ucsd.edu/sap/opu/odata/ITUS/PR_MY_MODULES_V2_SRV/">
+<id>https://tss.ucsd.edu/sap/opu/odata/ITUS/PR_MY_MODULES_V2_SRV/ModuleHeaderSet(SmObjid='00009462',SmOtype='SM',ScObjid='00000257',ModregId=guid'25219bb5-97e6-1fd1-a1e6-43710c4e1290',EventPackageId='00154645',AcademicYear='2026',AcademicSession='002')/Event</id>
+<title type="text">EventSet</title>
+<entry>
+<id>https://tss.ucsd.edu/sap/opu/odata/ITUS/PR_MY_MODULES_V2_SRV/EventSet(EventPackageId='00154645',EventId='00000980')</id>
+<content type="application/xml">
+<m:properties>
+<d:AcademicSession>002</d:AcademicSession>
+<d:EventPackageId>00154645</d:EventPackageId>
+<d:EventScheduleDays>MO/WE/FR</d:EventScheduleDays>
+<d:AcademicYear>2026</d:AcademicYear>
+<d:AssignedCg>00000492</d:AssignedCg>
+<d:Booked>true</d:Booked>
+<d:BookedPlaces>00125</d:BookedPlaces>
+<d:Category/>
+<d:CategoryText/>
+<d:DayName>Friday</d:DayName>
+<d:DayNumber>5</d:DayNumber>
+<d:DeliveryMode>REG</d:DeliveryMode>
+<d:DeliveryModeText>In Person</d:DeliveryModeText>
+<d:DShort>CSE123-LE</d:DShort>
+<d:DStext>CSE-123-LE (001-000)</d:DStext>
+<d:EndTime>PT10H50M00S</d:EndTime>
+<d:EventDate>2026-09-25T00:00:00</d:EventDate>
+<d:EventId>00000980</d:EventId>
+<d:EventShort>001-000-LE</d:EventShort>
+<d:EventStext>CSE-123-LE (001-000)</d:EventStext>
+<d:FreePlaces>00071</d:FreePlaces>
+<d:HasMultipleSchedules>true</d:HasMultipleSchedules>
+<d:InstrObjid>10366731</d:InstrObjid>
+<d:InstrText>Alex Snoeren</d:InstrText>
+<d:LocationObjid>00000001</d:LocationObjid>
+<d:LocationShort>UC San Diego</d:LocationShort>
+<d:LocationStext>UC San Diego</d:LocationStext>
+<d:MandatoryEventType>true</d:MandatoryEventType>
+<d:Method>LE</d:Method>
+<d:MethodText>Lecture</d:MethodText>
+<d:ModregId>25219bb5-97e6-1fd1-a1e6-43710c4e1290</d:ModregId>
+<d:RoomObjid>00000105</d:RoomObjid>
+<d:RoomShort>CENTR 115</d:RoomShort>
+<d:RoomStext>Room 115 - Lecture Hall</d:RoomStext>
+<d:ScheduleText>FR 10:00-10:50 09/25/2026 - 12/11/2026</d:ScheduleText>
+<d:ScObjid>00000257</d:ScObjid>
+<d:SmObjid>00009462</d:SmObjid>
+<d:SmStatus>01</d:SmStatus>
+<d:SmStext>Computer Networks</d:SmStext>
+<d:StartTime>PT10H00M00S</d:StartTime>
+<d:TotalPlaces>196</d:TotalPlaces>
+</m:properties>
+</content>
+</entry>
+<entry>
+<id>https://tss.ucsd.edu/sap/opu/odata/ITUS/PR_MY_MODULES_V2_SRV/EventSet(EventPackageId='00154645',EventId='00003987')</id>
+<content type="application/xml">
+<m:properties>
+<d:AcademicSession>002</d:AcademicSession>
+<d:EventPackageId>00154645</d:EventPackageId>
+<d:EventScheduleDays>MO</d:EventScheduleDays>
+<d:AcademicYear>2026</d:AcademicYear>
+<d:AssignedCg>00000492</d:AssignedCg>
+<d:Booked>true</d:Booked>
+<d:DayName>Monday</d:DayName>
+<d:DayNumber>1</d:DayNumber>
+<d:DeliveryMode>REG</d:DeliveryMode>
+<d:DeliveryModeText>In Person</d:DeliveryModeText>
+<d:DShort>CSE123-DI</d:DShort>
+<d:DStext>CSE-123-DI (001-001)</d:DStext>
+<d:EndTime>PT16H50M00S</d:EndTime>
+<d:EventDate>2026-09-28T00:00:00</d:EventDate>
+<d:EventId>00003987</d:EventId>
+<d:EventShort>001-001-DI</d:EventShort>
+<d:EventStext>CSE-123-DI (001-001)</d:EventStext>
+<d:FreePlaces>00071</d:FreePlaces>
+<d:HasMultipleSchedules>true</d:HasMultipleSchedules>
+<d:InstrObjid>10366731</d:InstrObjid>
+<d:InstrText>Alex Snoeren</d:InstrText>
+<d:LocationObjid>00000001</d:LocationObjid>
+<d:LocationShort>UC San Diego</d:LocationShort>
+<d:LocationStext>UC San Diego</d:LocationStext>
+<d:MandatoryEventType>true</d:MandatoryEventType>
+<d:Method>DI</d:Method>
+<d:MethodText>Discussion</d:MethodText>
+<d:ModregId>25219bb5-97e6-1fd1-a1e6-43710c4e1290</d:ModregId>
+<d:RoomObjid>00000838</d:RoomObjid>
+<d:RoomShort>WLH 2005</d:RoomShort>
+<d:RoomStext>Room 2005 - Lecture Hall</d:RoomStext>
+<d:ScheduleText>MO 16:00-16:50 09/28/2026 - 11/30/2026</d:ScheduleText>
+<d:ScObjid>00000257</d:ScObjid>
+<d:SmObjid>00009462</d:SmObjid>
+<d:SmStatus>01</d:SmStatus>
+<d:SmStext>Computer Networks</d:SmStext>
+<d:StartTime>PT16H00M00S</d:StartTime>
+<d:TotalPlaces>196</d:TotalPlaces>
+</m:properties>
+</content>
+</entry>
+</feed>

@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": { "url": "https://tss.ucsd.edu/fiori" }
+    },
+    "condition": {
+      "regexFilter": "^https://tss\\.ucsd\\.edu/?$",
+      "resourceTypes": ["main_frame"]
+    }
+  }
+]
