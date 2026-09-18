@@ -1,0 +1,51 @@
+button[id$="-btnAdapt"] {
+  display: none !important;
+}
+
+.sapUiMdcFilterBarBase .sapUiAFLayoutSpacer {
+  display: none !important;
+}
+
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="BasicSearchField-label"]) { order: 1; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicYear-label"]) { order: 2; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicPeriod-label"]) { order: 3; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DepartmentText-label"]) { order: 4; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Instructor-label"]) { order: 5; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DoW-label"]) { order: 6; }
+
+#tssreg-soc-separator { order: 10; }
+
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicLevel2-label"]) { order: 20; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Building-label"]) { order: 21; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Location-label"]) { order: 22; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DeliveryMode-label"]) { order: 23; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::EventID-label"]) { order: 24; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::seatsAvailable-label"]) { order: 25; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::wishlisted-label"]) { order: 26; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::CustomFilterField::Credits-label"]) { order: 27; }
+
+.sapUiMdcFilterBarBase .sapUiAFLayoutEnd {
+  order: 1000;
+  position: static !important;
+  flex-grow: 0 !important;
+  margin-left: auto !important;
+}
+
+#tssreg-soc-separator {
+  flex-basis: 100% !important;
+  border: none;
+  border-top: 1px solid #999999;
+  margin: 16px 0 8px 0 !important;
+}
+
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::AcademicLevel2-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::Building-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::Location-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::DeliveryMode-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::EventID-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::seatsAvailable-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::wishlisted-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::CustomFilterField::Credits-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) #tssreg-soc-separator {
+  display: none !important;
+}

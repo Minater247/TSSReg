@@ -5,6 +5,14 @@
   "description": "Fixes UCSD Triton Student System quirks.",
   "permissions": ["declarativeNetRequest"],
   "host_permissions": ["https://tss.ucsd.edu/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://tss.ucsd.edu/fiori*"],
+      "css": ["soc-filters.css"],
+      "js": ["soc-filters.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "declarative_net_request": {
     "rule_resources": [
       {
