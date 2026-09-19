@@ -9,6 +9,7 @@
     {
       "matches": ["https://tss.ucsd.edu/fiori*"],
       "css": ["soc-filters.css"],
+      "js": ["soc-search-normalize.js"],
       "run_at": "document_idle"
     },
     {
