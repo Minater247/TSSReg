@@ -9,7 +9,12 @@
     {
       "matches": ["https://tss.ucsd.edu/fiori*"],
       "css": ["soc-filters.css"],
-      "js": ["soc-filters.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://tss.ucsd.edu/fiori*"],
+      "js": ["soc-filters.js", "soc-credits-range.js"],
+      "world": "MAIN",
       "run_at": "document_idle"
     }
   ],

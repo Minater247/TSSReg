@@ -1,5 +1,7 @@
 (() => {
-  function filterBar() {
+  let expanded = false;
+
+  function filterBarElement() {
     return (
       [...document.querySelectorAll('[id*="--fe::FilterBar::"]')].find((e) =>
         /--fe::FilterBar::[^:]+$/.test(e.id)
@@ -7,7 +9,8 @@
     );
   }
 
-  function setExpanded(bar, button, expanded) {
+  function applyExpanded(bar, button) {
+    if (bar.classList.contains("tssreg-expanded") === expanded) return;
     bar.classList.toggle("tssreg-expanded", expanded);
     button.querySelector("bdi").textContent = expanded ? "Fewer Filters" : "More Filters";
   }
@@ -24,9 +27,13 @@
 
   function ensureToggle(bar) {
     ensureSeparator(bar);
-    if (bar.querySelector("#tssreg-more-filters")) return;
+    const existing = bar.querySelector("#tssreg-more-filters");
+    if (existing) {
+      applyExpanded(bar, existing);
+      return existing;
+    }
     const adapt = bar.querySelector('[id$="-btnAdapt"]');
-    if (!adapt) return;
+    if (!adapt) return null;
 
     const button = document.createElement("button");
     button.id = "tssreg-more-filters";
@@ -36,7 +43,8 @@
       '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnTransparent">' +
       '<span class="sapMBtnContent"><bdi>More Filters</bdi></span></span>';
     button.addEventListener("click", () => {
-      setExpanded(bar, button, !bar.classList.contains("tssreg-expanded"));
+      expanded = !expanded;
+      applyExpanded(bar, button);
     });
 
     const wrapper = document.createElement("div");
@@ -44,16 +52,19 @@
     wrapper.appendChild(button);
     adapt.parentElement.insertAdjacentElement("afterend", wrapper);
 
-    setExpanded(bar, button, false);
+    applyExpanded(bar, button);
+    return button;
   }
 
-  function sync() {
+  function check() {
     if (!/^#YSchedule-view(?:[?&]|$)/.test(location.hash || "")) return;
-    const bar = filterBar();
+    const bar = filterBarElement();
     if (bar) ensureToggle(bar);
   }
 
-  new MutationObserver(sync).observe(document.body, { childList: true, subtree: true });
-  window.addEventListener("hashchange", sync);
-  sync();
+  sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {
+    Rendering.attachUIUpdated(check);
+    window.addEventListener("hashchange", check);
+    check();
+  });
 })();
