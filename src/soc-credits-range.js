@@ -7,14 +7,6 @@
   let fetchingKey = null;
   let fallbackFetched = false;
 
-  function filterBarElement() {
-    return (
-      [...document.querySelectorAll('[id*="--fe::FilterBar::"]')].find((e) =>
-        /--fe::FilterBar::[^:]+$/.test(e.id)
-      ) || null
-    );
-  }
-
   function fieldControl(bar, name) {
     const el = bar.querySelector('[id$="::FilterField::' + name + '"]');
     return el ? sap.ui.getCore().byId(el.id) : null;
@@ -91,10 +83,7 @@
       .catch(() => {});
   }
 
-  function check() {
-    if (!/^#YSchedule-view(?:[?&]|$)/.test(location.hash || "")) return;
-    const bar = filterBarElement();
-    if (!bar) return;
+  function check(bar) {
     reapplyRange(bar);
 
     const yearField = fieldControl(bar, "AcademicYear");
@@ -110,9 +99,5 @@
     fetchRange(bar, year, term);
   }
 
-  sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {
-    Rendering.attachUIUpdated(check);
-    window.addEventListener("hashchange", check);
-    check();
-  });
+  window.__tssregShared.onScheduleTick(check);
 })();

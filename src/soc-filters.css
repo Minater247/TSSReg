@@ -6,6 +6,25 @@ button[id$="-btnAdapt"] {
   display: none !important;
 }
 
+.sapUiMdcFilterBarBase [id$="::FilterField::DoW-inner"] {
+  display: none !important;
+}
+
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Location-label"]) {
+  display: none !important;
+}
+
+.tssreg-dow-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.tssreg-dow-btn {
+  min-width: 2rem;
+}
+
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="BasicSearchField-label"]) { order: 1; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicYear-label"]) { order: 2; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicPeriod-label"]) { order: 3; }
@@ -17,7 +36,6 @@ button[id$="-btnAdapt"] {
 
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicLevel2-label"]) { order: 20; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Building-label"]) { order: 21; }
-.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Location-label"]) { order: 22; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DeliveryMode-label"]) { order: 23; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::EventID-label"]) { order: 24; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::seatsAvailable-label"]) { order: 25; }
@@ -40,7 +58,6 @@ button[id$="-btnAdapt"] {
 
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::AcademicLevel2-label"]),
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::Building-label"]),
-.sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::Location-label"]),
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::DeliveryMode-label"]),
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::EventID-label"]),
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::seatsAvailable-label"]),

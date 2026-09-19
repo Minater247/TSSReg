@@ -1,14 +1,6 @@
 (() => {
   let expanded = false;
 
-  function filterBarElement() {
-    return (
-      [...document.querySelectorAll('[id*="--fe::FilterBar::"]')].find((e) =>
-        /--fe::FilterBar::[^:]+$/.test(e.id)
-      ) || null
-    );
-  }
-
   function applyExpanded(bar, button) {
     if (bar.classList.contains("tssreg-expanded") === expanded) return;
     bar.classList.toggle("tssreg-expanded", expanded);
@@ -56,15 +48,5 @@
     return button;
   }
 
-  function check() {
-    if (!/^#YSchedule-view(?:[?&]|$)/.test(location.hash || "")) return;
-    const bar = filterBarElement();
-    if (bar) ensureToggle(bar);
-  }
-
-  sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {
-    Rendering.attachUIUpdated(check);
-    window.addEventListener("hashchange", check);
-    check();
-  });
+  window.__tssregShared.onScheduleTick(ensureToggle);
 })();
