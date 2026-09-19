@@ -14,7 +14,7 @@
     },
     {
       "matches": ["https://tss.ucsd.edu/fiori*"],
-      "js": ["soc-shared.js", "soc-filters.js", "soc-credits-range.js", "soc-dow-buttons.js"],
+      "js": ["soc-shared.js", "soc-filters.js", "soc-credits-range.js", "soc-dow-buttons.js", "soc-availability.js"],
       "world": "MAIN",
       "run_at": "document_idle"
     }

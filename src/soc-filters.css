@@ -10,15 +10,19 @@ button[id$="-btnAdapt"] {
   display: none !important;
 }
 
+.sapUiMdcFilterBarBase [id$="::FilterField::seatsAvailable-inner"] {
+  display: none !important;
+}
+
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Location-label"]) {
   display: none !important;
 }
 
-.tssreg-dow-row {
+.tssreg-dow-row,
+.tssreg-avail-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
-  margin-top: 0.25rem;
 }
 
 .tssreg-dow-btn {
