@@ -3,15 +3,6 @@
   const BAND_ID = "tssreg-top-band";
   const GRID_ID = "tssreg-quicklinks";
 
-  const PRIMARY = [
-    "Schedule of Classes",
-    "Canvas",
-    "Degree Audit",
-    "Academic History",
-    "TritonPay",
-    "Financial Aid",
-  ];
-
   let modules = null;
 
   sap.ui.require(["sap/m/VBox", "sap/m/Image", "sap/m/Text"], (VBox, Image, Text) => {
@@ -74,15 +65,15 @@
       band = document.createElement("div");
       band.id = BAND_ID;
       band.className = "tssreg-top-band";
-      inner.insertBefore(band, inner.firstChild);
     }
-    band.appendChild(cardWrapper);
+    if (band.parentElement !== inner) inner.insertBefore(band, inner.firstChild);
     let host = band.querySelector(".tssreg-quicklinks-host");
     if (!host) {
       host = document.createElement("div");
       host.className = "tssreg-quicklinks-host";
-      band.appendChild(host);
     }
+    band.insertBefore(cardWrapper, band.firstChild);
+    band.insertBefore(host, cardWrapper.nextSibling);
     return host;
   }
 
@@ -94,8 +85,8 @@
     const cardWrapper = inner && inner.querySelector('[id$="--' + IDENTITY_CARD + '"]');
     if (!inner || !cardWrapper) return;
 
-    const links = PRIMARY.map((text) => window.__tssregShared.overviewLinkByText(text)).filter(Boolean);
-    if (links.length !== PRIMARY.length) return;
+    const links = window.__tssregShared.overviewPrimaryLinks();
+    if (!links) return;
 
     const grid = sap.ui.getCore().byId(GRID_ID) || buildGrid(links);
     grid.placeAt(mountBand(inner, cardWrapper));

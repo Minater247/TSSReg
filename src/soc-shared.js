@@ -7,7 +7,7 @@
   const uiCallbacks = [];
   const moduleFilters = [];
   const OVERVIEW_LAYOUT = ".sapUshellEasyScanLayoutInner";
-  let overviewLinks = null;
+  let overviewPrimary = null;
   let dashboardObserver = null;
   let lastInner = null;
   let lastInnerCount = -1;
@@ -25,12 +25,12 @@
     uiCallbacks.push(fn);
   }
 
-  function setOverviewLinks(links) {
-    overviewLinks = links;
+  function setOverviewPrimary(links) {
+    overviewPrimary = links;
   }
 
-  function overviewLinkByText(text) {
-    return (overviewLinks || []).find((link) => link.text === text) || null;
+  function overviewPrimaryLinks() {
+    return overviewPrimary;
   }
 
   function registerModuleFilter(filter) {
@@ -298,8 +298,8 @@
     onScheduleTick,
     onUiUpdated,
     registerModuleFilter,
-    setOverviewLinks,
-    overviewLinkByText,
+    setOverviewPrimary,
+    overviewPrimaryLinks,
     chunk,
     fetchJson,
   };

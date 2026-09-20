@@ -7,6 +7,12 @@
   "host_permissions": ["https://tss.ucsd.edu/*"],
   "content_scripts": [
     {
+      "matches": ["https://tss.ucsd.edu/*"],
+      "js": ["timezone-fix.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
       "matches": ["https://tss.ucsd.edu/fiori*"],
       "css": ["soc-filters.css", "overview.css", "shell.css"],
       "js": ["soc-search-normalize.js"],

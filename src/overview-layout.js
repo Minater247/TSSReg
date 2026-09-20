@@ -1,40 +1,99 @@
 (() => {
-  const DES_CARD_TYPE = "0002";
   const LINK_CARDS = ["card01", "card02", "card03"];
   const MODEL_NAME = "tssreg";
+  const BAND_ID = "tssreg-more-band";
+  const PANEL_ID = "tssreg-more-services";
 
-  const GROUP_BY_TEXT = {
-    "Schedule of Classes": "Enrollment",
-    "My Appointment Times": "Enrollment",
-    "My Holds": "Enrollment",
-    "Triton Enrollment Authorization": "Enrollment",
-    "TGPT-Class Planner": "Enrollment",
-    Canvas: "Academics",
-    "Academic History": "Academics",
-    "Degree Audit": "Academics",
-    "Order Transcripts": "Academics",
-    TritonPay: "Finances",
-    "Financial Aid": "Finances",
-    "Triton Cash Account": "Finances",
-    "My Bank Accounts": "Finances",
-    "My Personal Details": "Profile & Privacy",
-    "My Privacy Details": "Profile & Privacy",
-    "Virtual Advising Center": "Support",
-    "U.S. Citizens Register to Vote": "Support",
-  };
+  const PRIMARY = [
+    "Schedule of Classes",
+    "Canvas",
+    "Degree Audit",
+    "Academic History",
+    "TritonPay",
+    "Financial Aid",
+  ];
 
-  const CARD_GROUPS = {
-    card01: { title: "Enrollment & Academics", groups: ["Enrollment", "Academics"] },
-    card03: { title: "Finances & Services", groups: ["Finances", "Profile & Privacy", "Support", "More"] },
-  };
+  const SECONDARY = [
+    {
+      card: "card01",
+      title: "Enrollment",
+      texts: [
+        "My Appointment Times",
+        "TGPT-Class Planner",
+        "My Holds",
+        "Course Catalog",
+        "Triton Enrollment Authorization",
+      ],
+    },
+    {
+      card: "card02",
+      title: "Records & Profile",
+      texts: ["Order Transcripts", "My Personal Details"],
+    },
+    {
+      card: "card03",
+      title: "Money & Support",
+      texts: ["Triton Cash Account", "Virtual Advising Center", "Financial Assistance", "My Bank Accounts"],
+    },
+  ];
+
+  const GROUPS = [
+    {
+      label: "Registration & Enrollment",
+      texts: [
+        "Schedule of Classes",
+        "My Appointment Times",
+        "Triton Enrollment Authorization",
+        "Course Catalog",
+        "My Applications",
+      ],
+    },
+    {
+      label: "Academics",
+      texts: [
+        "Academic History",
+        "Degree Audit",
+        "Order Transcripts",
+        "TGPT-Class Planner",
+        "Canvas",
+        "Extended Studies Canvas",
+      ],
+    },
+    {
+      label: "Financial",
+      texts: ["TritonPay", "Triton Cash Account", "Financial Aid", "Financial Assistance", "My Bank Accounts"],
+    },
+    {
+      label: "Personal & Privacy",
+      texts: ["My Personal Details", "My Privacy Details", "Legal Name Change", "My Holds"],
+    },
+    {
+      label: "Support & Services",
+      texts: [
+        "Student Services Contact Information",
+        "Disability Services",
+        "Virtual Advising Center",
+        "Veterans Education Benefits",
+        "U.S. Citizens Register to Vote",
+      ],
+    },
+  ];
 
   let cache = null;
   let modules = null;
 
   sap.ui.require(
-    ["sap/ui/model/json/JSONModel", "sap/ui/model/Sorter", "sap/m/StandardListItem"],
-    (JSONModel, Sorter, StandardListItem) => {
-      modules = { JSONModel, Sorter, StandardListItem };
+    [
+      "sap/ui/model/json/JSONModel",
+      "sap/m/StandardListItem",
+      "sap/m/List",
+      "sap/m/Panel",
+      "sap/m/VBox",
+      "sap/m/Text",
+      "sap/ui/layout/cssgrid/CSSGrid",
+    ],
+    (JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid) => {
+      modules = { JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid };
     }
   );
 
@@ -58,47 +117,75 @@
     return /^\/Link\d+Set$/.test(path || "") ? path : null;
   }
 
+  function normalizeText(value) {
+    return String(value || "")
+      .replace(/[​-‍⁠﻿]/g, "")
+      .trim();
+  }
+
   function harvest() {
     if (cache) return true;
     const links = [];
+    const seen = {};
     for (let i = 0; i < LINK_CARDS.length; i++) {
       const list = listControl(LINK_CARDS[i]);
       if (!list || !boundEntitySet(list) || !list.getItems().length) return false;
       list.getItems().forEach((item) => {
         const context = item.getBindingContext();
         const data = context && context.getObject();
-        if (!data || !data.Url) return;
+        if (!data || !data.Url || seen[data.Url]) return;
+        seen[data.Url] = true;
         links.push({
-          text: data.Text,
+          text: normalizeText(data.Text),
           url: data.Url,
           icon: data.ImageUrl,
           newWindow: !!data.NewWindow,
-          cardType: data.CardType,
         });
       });
     }
-    if (!links.length) return false;
 
-    const primaryUrls = new Set(links.filter((l) => l.cardType !== DES_CARD_TYPE).map((l) => l.url));
-    cache = {
-      primaryUrls,
-      main: links
-        .filter((l) => l.cardType !== DES_CARD_TYPE)
-        .map((l) => Object.assign({}, l, { group: GROUP_BY_TEXT[l.text] || "More" })),
-    };
-    window.__tssregShared.setOverviewLinks(cache.main);
+    const byText = {};
+    links.forEach((link) => {
+      if (!byText[link.text]) byText[link.text] = link;
+    });
+    const primary = PRIMARY.map((text) => byText[text]).filter(Boolean);
+    if (primary.length !== PRIMARY.length) return false;
+
+    cache = { links, byText };
+    window.__tssregShared.setOverviewPrimary(primary);
     return true;
   }
 
-  function hideDuplicateLinks() {
-    const list = listControl("card02");
-    if (!list || !boundEntitySet(list)) return;
-    list.getItems().forEach((item) => {
-      const context = item.getBindingContext();
-      const data = context && context.getObject();
-      if (!data || !data.Url || !item.getVisible()) return;
-      if (cache.primaryUrls.has(data.Url)) item.setVisible(false);
+  function promotedTexts() {
+    const promoted = {};
+    PRIMARY.forEach((text) => {
+      promoted[text] = true;
     });
+    SECONDARY.forEach((group) => {
+      group.texts.forEach((text) => {
+        promoted[text] = true;
+      });
+    });
+    return promoted;
+  }
+
+  function moreGroups() {
+    const promoted = promotedTexts();
+    const claimed = {};
+    const groups = GROUPS.map((group) => {
+      const items = [];
+      group.texts.forEach((text) => {
+        const link = cache.byText[text];
+        if (!link) return;
+        claimed[text] = true;
+        if (!promoted[text]) items.push(link);
+      });
+      return { label: group.label, items };
+    }).filter((group) => group.items.length);
+
+    const leftover = cache.links.filter((link) => !claimed[link.text] && !promoted[link.text]);
+    if (leftover.length) groups.push({ label: "More", items: leftover });
+    return groups.sort((a, b) => b.items.length - a.items.length);
   }
 
   function navigate(link) {
@@ -114,36 +201,23 @@
     location.href = link.url;
   }
 
-  function applyGroupedList(card) {
-    const config = CARD_GROUPS[card];
-    const list = listControl(card);
-    if (!config || !list) return;
+  function linkTemplate() {
+    return new modules.StandardListItem({
+      title: "{" + MODEL_NAME + ">text}",
+      icon: "{" + MODEL_NAME + ">icon}",
+      wrapping: true,
+      type: "Navigation",
+      press: (event) => {
+        const context = event.getSource().getBindingContext(MODEL_NAME);
+        navigate(context && context.getObject());
+      },
+    });
+  }
 
-    const info = list.getBindingInfo("items");
-    if (info && info.path === "/links") return;
-
-    const rows = cache.main
-      .filter((link) => config.groups.indexOf(link.group) !== -1)
-      .map((link) => Object.assign({}, link, { groupIndex: config.groups.indexOf(link.group) }));
-    if (!rows.length) return;
-
+  function bindLinks(list, rows) {
     list.unbindItems();
     list.setModel(new modules.JSONModel({ links: rows }), MODEL_NAME);
-    list.bindItems({
-      path: MODEL_NAME + ">/links",
-      sorter: new modules.Sorter("groupIndex", false, (context) => ({
-        key: context.getProperty("group"),
-      })),
-      template: new modules.StandardListItem({
-        title: "{" + MODEL_NAME + ">text}",
-        icon: "{" + MODEL_NAME + ">icon}",
-        type: "Navigation",
-        press: (event) => {
-          const context = event.getSource().getBindingContext(MODEL_NAME);
-          navigate(context && context.getObject());
-        },
-      }),
-    });
+    list.bindItems({ path: MODEL_NAME + ">/links", template: linkTemplate() });
   }
 
   function applyCardTitle(card, title) {
@@ -151,6 +225,62 @@
     const titleEl = cardEl && cardEl.querySelector('[id$="ovpHeaderTitle"]');
     const control = titleEl && sap.ui.getCore().byId(titleEl.id);
     if (control && control.getText && control.getText() !== title) control.setText(title);
+  }
+
+  function applySecondary(config) {
+    const list = listControl(config.card);
+    if (!list) return;
+    const rows = config.texts.map((text) => cache.byText[text]).filter(Boolean);
+    if (!rows.length) return;
+    const info = list.getBindingInfo("items");
+    if (!info || info.path !== "/links") bindLinks(list, rows);
+    applyCardTitle(config.card, config.title);
+  }
+
+  function moreColumn(group) {
+    const label = new modules.Text({ text: group.label });
+    label.addStyleClass("tssreg-more-label");
+    const list = new modules.List({ showSeparators: "None" });
+    bindLinks(list, group.items);
+    const column = new modules.VBox({ renderType: "Bare", items: [label, list] });
+    column.addStyleClass("tssreg-more-column");
+    return column;
+  }
+
+  function buildMorePanel(groups) {
+    const grid = new modules.CSSGrid({
+      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+      gridGap: "18px",
+    });
+    groups.forEach((group) => grid.addItem(moreColumn(group)));
+    const panel = new modules.Panel(PANEL_ID, {
+      headerText: "More Services",
+      expandable: true,
+      expanded: false,
+      width: "100%",
+      content: [grid],
+    });
+    panel.addStyleClass("tssreg-more-panel");
+    return panel;
+  }
+
+  function mountMoreBand(inner) {
+    let band = document.getElementById(BAND_ID);
+    if (!band) {
+      band = document.createElement("div");
+      band.id = BAND_ID;
+      band.className = "tssreg-more-band";
+    }
+    if (band.parentElement !== inner) inner.appendChild(band);
+    return band;
+  }
+
+  function applyMore(inner) {
+    if (document.getElementById(PANEL_ID)) return;
+    const groups = moreGroups();
+    if (!groups.length) return;
+    const panel = sap.ui.getCore().byId(PANEL_ID) || buildMorePanel(groups);
+    panel.placeAt(mountMoreBand(inner));
   }
 
   function disableDragAndDrop() {
@@ -168,11 +298,9 @@
     if (!isOverviewRoute() || !modules) return;
     disableDragAndDrop();
     if (!harvest()) return;
-    hideDuplicateLinks();
-    Object.keys(CARD_GROUPS).forEach((card) => {
-      applyGroupedList(card);
-      applyCardTitle(card, CARD_GROUPS[card].title);
-    });
+    SECONDARY.forEach(applySecondary);
+    const inner = document.querySelector(".sapUshellEasyScanLayoutInner");
+    if (inner) applyMore(inner);
   }
 
   window.__tssregShared.onUiUpdated(apply);

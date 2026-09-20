@@ -42,6 +42,109 @@
   order: -1;
 }
 
+.sapUshellEasyScanLayoutInner > [id$="--card05"] {
+  display: none !important;
+}
+
+.tssreg-more-band {
+  grid-column: 1 / -1;
+  order: 1;
+  padding: 8px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.tssreg-more-band .sapMPanel {
+  background: #ffffff !important;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tssreg-more-band .sapMPanelHeadingDiv {
+  padding: 0;
+}
+
+.tssreg-more-band .sapMPanelWrappingDiv {
+  padding: 6px 16px;
+}
+
+.tssreg-more-band .sapMPanelWrappingDiv > .sapUiIcon {
+  left: auto !important;
+  right: 16px !important;
+}
+
+.tssreg-more-band .sapMPanelAnimating.sapMPanelExpanded .sapMPanelWrappingDiv > .sapUiIcon {
+  transform: translateY(-50%) rotate(-90deg);
+}
+
+.tssreg-more-band .sapMPanelAnimating:not(.sapMPanelExpanded) .sapMPanelWrappingDiv > .sapUiIcon {
+  transform: translateY(-50%) rotate(90deg);
+}
+
+.tssreg-more-band .sapMPanelHdr {
+  margin-left: 0 !important;
+  font-size: 1.0625rem !important;
+  font-weight: 600 !important;
+}
+
+.tssreg-more-band .sapMPanelContent {
+  padding: 4px 16px 16px !important;
+  border-top: 0 !important;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) {
+  align-self: stretch;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) > div,
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) [id$="-uiarea"],
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapUiXMLView,
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) [id$="ovpCardControl"],
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) [id$="ovpCardControl"] > .sapMFlexBox {
+  height: 100% !important;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapOvpCardTitle,
+.tssreg-more-band .tssreg-more-label {
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #777 !important;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapOvpCardTitle {
+  margin: 14px 0 6px 16px !important;
+}
+
+.tssreg-more-band .tssreg-more-label {
+  padding-bottom: 8px;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapMSLI,
+.tssreg-more-band .sapMSLI {
+  height: auto !important;
+  min-height: 48px !important;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapMSLIDiv,
+.tssreg-more-band .sapMSLIDiv {
+  padding: 10px 0 !important;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapMSLIImg,
+.tssreg-more-band .sapMSLIImg {
+  width: 28px !important;
+  height: 28px !important;
+  margin-right: 14px !important;
+}
+
+.sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) .sapMSLITitleOnly,
+.tssreg-more-band .sapMSLITitleOnly {
+  font-size: 1rem !important;
+}
+
 .tssreg-top-band {
   grid-column: 1 / -1;
   order: -2;
@@ -95,7 +198,6 @@
 .tssreg-top-band .sapFAvatar .sapFAvatarImageHolder {
   width: 60px !important;
   height: 60px !important;
-  border-radius: 50% !important;
 }
 
 .tssreg-top-band .sapUiSimpleForm .sapUiRespGridBreak {
