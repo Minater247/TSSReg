@@ -34,7 +34,31 @@ button[id$="-btnAdapt"] {
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::AcademicPeriod-label"]) { order: 3; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DepartmentText-label"]) { order: 4; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::Instructor-label"]) { order: 5; }
-.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DoW-label"]) { order: 6; }
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DoW-label"]) {
+  order: 6;
+  display: flex !important;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  column-gap: 2rem;
+  flex-basis: max-content !important;
+  flex-grow: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::DoW-label"]) > .sapUiVlt {
+  flex: 0 0 auto !important;
+  width: max-content !important;
+}
+
+#tssreg-conflict-item {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+}
 
 #tssreg-soc-separator { order: 10; }
 
@@ -48,7 +72,10 @@ button[id$="-btnAdapt"] {
 #tssreg-timeofday-item {
   order: 28;
   flex: 1 0 12rem;
-  max-width: 24rem;
+  max-width: 24rem !important;
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 4px !important;
   display: block;
   height: auto !important;
   margin-left: 0 !important;
@@ -63,6 +90,7 @@ button[id$="-btnAdapt"] {
   order: 1000;
   position: static !important;
   flex-grow: 0 !important;
+  flex-basis: 100% !important;
   margin-left: auto !important;
 }
 

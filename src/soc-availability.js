@@ -35,7 +35,7 @@
       const inner = btn.querySelector(".sapMBtnInner");
       const isSelected = btn.dataset.mode === mode;
       inner.classList.toggle("sapMBtnEmphasized", isSelected);
-      inner.classList.toggle("sapMBtnTransparent", !isSelected);
+      inner.classList.toggle("sapMBtnDefault", !isSelected);
       btn.setAttribute("aria-pressed", String(isSelected));
     });
   }
@@ -63,7 +63,7 @@
       button.dataset.mode = code;
       button.title = label;
       button.innerHTML =
-        '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnTransparent">' +
+        '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnDefault">' +
         '<span class="sapMBtnContent"><bdi>' + label + "</bdi></span></span>";
       button.addEventListener("click", () => setMode(bar, code));
       row.appendChild(button);

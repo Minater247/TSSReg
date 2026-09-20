@@ -29,7 +29,7 @@
       const inner = btn.querySelector(".sapMBtnInner");
       const isSelected = selectedDays.has(btn.dataset.day);
       inner.classList.toggle("sapMBtnEmphasized", isSelected);
-      inner.classList.toggle("sapMBtnTransparent", !isSelected);
+      inner.classList.toggle("sapMBtnDefault", !isSelected);
       btn.setAttribute("aria-pressed", String(isSelected));
     });
   }
@@ -40,7 +40,13 @@
     applyButtonState(bar);
   }
 
+  function ensureLabel(bar) {
+    const label = bar.querySelector('[id$="::FilterField::DoW-label"] bdi');
+    if (label && label.textContent === "Day of the Week") label.textContent = "Days of the Week";
+  }
+
   function ensureButtons(bar) {
+    ensureLabel(bar);
     const controlEl = bar.querySelector('[id$="::FilterField::DoW"]');
     if (!controlEl) return;
     if (controlEl.querySelector(".tssreg-dow-row")) {
@@ -60,7 +66,7 @@
       button.dataset.day = code;
       button.title = label;
       button.innerHTML =
-        '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnTransparent">' +
+        '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnDefault">' +
         '<span class="sapMBtnContent"><bdi>' + short + "</bdi></span></span>";
       button.addEventListener("click", () => toggleDay(bar, code));
       row.appendChild(button);

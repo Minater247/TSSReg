@@ -20,7 +20,8 @@
         "soc-credits-range.js",
         "soc-dow-buttons.js",
         "soc-availability.js",
-        "soc-timeofday.js"
+        "soc-timeofday.js",
+        "soc-conflict.js"
       ],
       "world": "MAIN",
       "run_at": "document_idle"
