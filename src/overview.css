@@ -9,7 +9,8 @@
   margin-right: auto !important;
 }
 
-.sapFDynamicPageContentWrapper > div:has(.sapOvpDashboard) {
+.ovpApplication .sapFDynamicPageContent,
+.ovpApplication .sapFDynamicPageContentFitContainer {
   padding-top: 7px !important;
 }
 

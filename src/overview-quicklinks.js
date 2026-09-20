@@ -53,6 +53,7 @@
     box.addEventDelegate({
       onAfterRendering: () => {
         const dom = box.getDomRef();
+        if (!dom) return;
         dom.setAttribute("role", "link");
         dom.setAttribute("tabindex", "0");
       },
