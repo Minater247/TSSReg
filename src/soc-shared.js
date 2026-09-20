@@ -6,6 +6,12 @@
   const tickCallbacks = [];
   const uiCallbacks = [];
   const moduleFilters = [];
+  const OVERVIEW_LAYOUT = ".sapUshellEasyScanLayoutInner";
+  let overviewLinks = null;
+  let dashboardObserver = null;
+  let lastInner = null;
+  let lastInnerCount = -1;
+  let framePending = false;
 
   function filterBarElement() {
     return document.querySelector(".sapUiMdcFilterBarBase");
@@ -17,6 +23,14 @@
 
   function onUiUpdated(fn) {
     uiCallbacks.push(fn);
+  }
+
+  function setOverviewLinks(links) {
+    overviewLinks = links;
+  }
+
+  function overviewLinkByText(text) {
+    return (overviewLinks || []).find((link) => link.text === text) || null;
   }
 
   function registerModuleFilter(filter) {
@@ -250,11 +264,42 @@
     tickCallbacks.forEach((fn) => fn(bar));
   }
 
+  function onDashboardMutated() {
+    const inner = document.querySelector(OVERVIEW_LAYOUT);
+    if (!inner) return;
+    const count = inner.children.length;
+    if (inner === lastInner && count === lastInnerCount) return;
+    lastInner = inner;
+    lastInnerCount = count;
+    if (framePending) return;
+    framePending = true;
+    requestAnimationFrame(() => {
+      framePending = false;
+      check();
+    });
+  }
+
+  function syncDashboardObserver() {
+    if (/^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "")) {
+      if (dashboardObserver) return;
+      dashboardObserver = new MutationObserver(onDashboardMutated);
+      dashboardObserver.observe(document.body, { childList: true, subtree: true });
+      return;
+    }
+    if (!dashboardObserver) return;
+    dashboardObserver.disconnect();
+    dashboardObserver = null;
+    lastInner = null;
+    lastInnerCount = -1;
+  }
+
   window.__tssregShared = {
     filterBarElement,
     onScheduleTick,
     onUiUpdated,
     registerModuleFilter,
+    setOverviewLinks,
+    overviewLinkByText,
     chunk,
     fetchJson,
   };
@@ -262,7 +307,11 @@
   patchNetwork();
   sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {
     Rendering.attachUIUpdated(check);
-    window.addEventListener("hashchange", check);
+    window.addEventListener("hashchange", () => {
+      syncDashboardObserver();
+      check();
+    });
+    syncDashboardObserver();
     check();
   });
 })();

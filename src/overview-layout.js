@@ -3,17 +3,6 @@
   const LINK_CARDS = ["card01", "card02", "card03"];
   const MODEL_NAME = "tssreg";
 
-  const CALENDAR_CARD = "card12";
-  const STRIP_ID = "tssreg-week-strip";
-
-  const CARD_PLACEMENT = [
-    ["card05", 1],
-    ["card01", 1],
-    ["card03", 2],
-    ["card02", 3],
-    ["card08", 4],
-  ];
-
   const GROUP_BY_TEXT = {
     "Schedule of Classes": "Enrollment",
     "My Appointment Times": "Enrollment",
@@ -97,6 +86,7 @@
         .filter((l) => l.cardType !== DES_CARD_TYPE)
         .map((l) => Object.assign({}, l, { group: GROUP_BY_TEXT[l.text] || "More" })),
     };
+    window.__tssregShared.setOverviewLinks(cache.main);
     return true;
   }
 
@@ -163,74 +153,26 @@
     if (control && control.getText && control.getText() !== title) control.setText(title);
   }
 
-  function calendarRowSpan(util, placement) {
-    const strip = document.getElementById(STRIP_ID);
-    const height = strip ? strip.getBoundingClientRect().height : 0;
-    if (!height) return 0;
-    return Math.ceil((height + placement.headerHeight + 2 * util.CARD_BORDER_PX) / util.getRowHeightPx());
-  }
-
-  function placeCards() {
-    const el = document.querySelector('[id$="--ovpLayout"]');
-    const layout = el && sap.ui.getCore().byId(el.id);
-    if (!layout || !layout.getDashboardLayoutModel || !layout.getDashboardLayoutUtil) return;
-
-    const model = layout.getDashboardLayoutModel();
-    const util = layout.getDashboardLayoutUtil();
-    if (!model || !model.aCards || !util) return;
-
-    if (!layout.__tssregResizeBound && layout.attachAfterDragEnds) {
-      layout.__tssregResizeBound = true;
-      layout.attachAfterDragEnds(placeCards);
+  function disableDragAndDrop() {
+    const layoutEl = document.querySelector(".sapUshellEasyScanLayout");
+    const layout = layoutEl && sap.ui.getCore().byId(layoutEl.id);
+    if (!layout || !layout.getDragAndDropEnabled || !layout.getDragAndDropEnabled()) return;
+    layout.setProperty("dragAndDropEnabled", false, true);
+    if (layout.layoutDragAndDrop) {
+      layout.layoutDragAndDrop.destroy();
+      delete layout.layoutDragAndDrop;
     }
-
-    const colCount = (util.oLayoutData && util.oLayoutData.colCount) || model.iColCount;
-    if (!colCount) return;
-
-    const byId = {};
-    model.aCards.forEach((card) => {
-      byId[card.id] = card.dashboardLayout;
-    });
-    const calendar = byId[CALENDAR_CARD];
-    if (!calendar || CARD_PLACEMENT.some(([id]) => !byId[id])) return;
-
-    const rowSpan = calendarRowSpan(util, calendar);
-    if (!rowSpan) return;
-
-    let changed = false;
-    function set(placement, key, value) {
-      if (placement[key] === value) return;
-      placement[key] = value;
-      changed = true;
-    }
-
-    const rowSpanChanged = calendar.rowSpan !== rowSpan;
-    set(calendar, "autoSpan", false);
-    set(calendar, "maxColSpan", colCount);
-    set(calendar, "colSpan", colCount);
-    set(calendar, "column", 1);
-    set(calendar, "row", 1);
-    set(calendar, "rowSpan", rowSpan);
-    CARD_PLACEMENT.forEach(([id, column]) => {
-      set(byId[id], "column", Math.min(column, colCount));
-      if (rowSpanChanged || byId[id].row <= rowSpan) set(byId[id], "row", rowSpan + 1);
-    });
-    if (!changed) return;
-
-    model._removeSpaceBeforeCard();
-    model.aCards.forEach((card) => util._sizeCard(card));
-    util._positionCards(model.aCards);
   }
 
   function apply() {
     if (!isOverviewRoute() || !modules) return;
+    disableDragAndDrop();
     if (!harvest()) return;
     hideDuplicateLinks();
     Object.keys(CARD_GROUPS).forEach((card) => {
       applyGroupedList(card);
       applyCardTitle(card, CARD_GROUPS[card].title);
     });
-    placeCards();
   }
 
   window.__tssregShared.onUiUpdated(apply);

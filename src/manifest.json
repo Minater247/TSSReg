@@ -23,7 +23,9 @@
         "soc-timeofday.js",
         "soc-conflict.js",
         "overview-layout.js",
-        "overview-calendar.js"
+        "overview-calendar.js",
+        "overview-identity.js",
+        "overview-quicklinks.js"
       ],
       "world": "MAIN",
       "run_at": "document_idle"

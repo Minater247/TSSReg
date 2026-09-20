@@ -1,3 +1,189 @@
+.sapUshellEasyScanLayout,
+.sapUshellEasyScanLayoutInner {
+  height: auto !important;
+}
+
+.sapUshellEasyScanLayout {
+  max-width: min(1200px, 100% - 80px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.sapFDynamicPageContentWrapper > div:has(.sapOvpDashboard) {
+  padding-top: 7px !important;
+}
+
+@media (max-width: 1024px) {
+  .sapUshellEasyScanLayout {
+    max-width: min(1200px, 100% - 32px) !important;
+  }
+}
+
+.sapUshellEasyScanLayoutInner {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  column-gap: 1rem;
+  row-gap: 2px;
+  align-items: start;
+}
+
+.sapUshellEasyScanLayoutInner .easyScanLayoutItemWrapper {
+  position: static !important;
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  transition: none !important;
+  overflow: visible !important;
+}
+
+.sapUshellEasyScanLayoutInner > [id$="--card12"] {
+  grid-column: 1 / -1;
+  order: -1;
+}
+
+.tssreg-top-band {
+  grid-column: 1 / -1;
+  order: -2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  column-gap: 1rem;
+  row-gap: 2px;
+  container-type: inline-size;
+}
+
+
+.tssreg-top-band > .easyScanLayoutItemWrapper {
+  flex: 0 0 300px;
+  margin-top: 0 !important;
+}
+
+.tssreg-top-band .sapMScrollContScroll {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  align-content: center;
+  column-gap: 1rem;
+  min-height: 100%;
+}
+
+.tssreg-top-band .sapMScrollContScroll > .sapUiHLayout {
+  display: contents;
+}
+
+.tssreg-top-band .sapUiHLayout > .sapUiHLayoutChildWrapper:first-child {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: auto !important;
+  height: auto !important;
+  align-self: center !important;
+}
+
+.tssreg-top-band .sapUiHLayout > .sapUiHLayoutChildWrapper:last-child {
+  grid-column: 2;
+  grid-row: 1;
+  width: auto !important;
+}
+
+.tssreg-top-band .sapMScrollContScroll > .sapUiSimpleForm {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.tssreg-top-band .sapFAvatar,
+.tssreg-top-band .sapFAvatar .sapFAvatarImageHolder {
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 50% !important;
+}
+
+.tssreg-top-band .sapUiSimpleForm .sapUiRespGridBreak {
+  padding-top: 0 !important;
+}
+
+@container (max-width: 585.99px) {
+  .tssreg-top-band > .easyScanLayoutItemWrapper {
+    flex: 1 1 100%;
+  }
+
+  .tssreg-top-band .sapUiHLayout > .sapUiHLayoutChildWrapper:first-child {
+    align-self: stretch !important;
+  }
+
+  .tssreg-top-band .sapFAvatar,
+  .tssreg-top-band .sapFAvatar .sapFAvatarImageHolder {
+    width: auto !important;
+    height: calc(100% - 0.5rem) !important;
+    aspect-ratio: 1 / 1 !important;
+  }
+}
+
+.tssreg-top-band .sapUiComponentContainer,
+.tssreg-top-band .sapUiComponentContainer > div,
+.tssreg-top-band .sapUiXMLView,
+.tssreg-top-band [id$="ovpCardControl"],
+.tssreg-top-band [id$="ovpCardControl"] > .sapMFlexBox,
+.tssreg-top-band [id$="ovpCardContentContainer"],
+.tssreg-top-band .sapMQuickViewCard,
+.tssreg-top-band .sapMNav,
+.tssreg-top-band .sapMScrollContH {
+  height: 100% !important;
+}
+
+.tssreg-quicklinks-host {
+  flex: 1 1 286px;
+  min-width: 286px;
+  container-type: inline-size;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.tssreg-quicklinks-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.625rem;
+  height: 100%;
+}
+
+@container (max-width: 410px) {
+  .tssreg-quicklinks-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tssreg-quicklinks-grid .tssreg-tile {
+  gap: 0.625rem;
+  padding: 18px 12px;
+  background: var(--tssreg-bg, #ffffff);
+  border: 1px solid var(--tssreg-border, #e5e5e5);
+  border-radius: 10px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.tssreg-quicklinks-grid .tssreg-tile:hover {
+  background: var(--tssreg-event-bg, #f2f7fa);
+}
+
+.tssreg-quicklinks-grid .tssreg-tile-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.tssreg-quicklinks-grid .tssreg-tile-label .sapMText,
+.tssreg-quicklinks-grid .tssreg-tile-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tssreg-text, #131e29);
+}
+
+.tssreg-top-band {
+  --tssreg-bg: #ffffff;
+  --tssreg-border: #e5e5e5;
+  --tssreg-text: #131e29;
+  --tssreg-event-bg: #f2f7fa;
+}
+
 #tssreg-week-strip {
   --tssreg-border: #e5e5e5;
   --tssreg-bg: #ffffff;
@@ -34,7 +220,7 @@
   border-radius: 8px;
   background: var(--tssreg-bg);
   padding: 10px 8px;
-  min-height: 80px;
+  min-height: 120px;
   box-sizing: border-box;
   gap: 6px;
 }

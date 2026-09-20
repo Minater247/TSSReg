@@ -270,7 +270,7 @@
     strip.addItem(nav);
 
     const grid = new modules.CSSGrid({
-      gridTemplateColumns: "repeat(7, minmax(120px, 1fr))",
+      gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
       gridGap: "8px",
     });
     days.forEach((day) => grid.addItem(dayBox(day, today)));
