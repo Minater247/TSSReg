@@ -4,6 +4,7 @@
     "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_MODULE";
   const FULL_IDS_TOP = 5000;
   const tickCallbacks = [];
+  const uiCallbacks = [];
   const moduleFilters = [];
 
   function filterBarElement() {
@@ -12,6 +13,10 @@
 
   function onScheduleTick(fn) {
     tickCallbacks.push(fn);
+  }
+
+  function onUiUpdated(fn) {
+    uiCallbacks.push(fn);
   }
 
   function registerModuleFilter(filter) {
@@ -238,13 +243,21 @@
   }
 
   function check() {
+    uiCallbacks.forEach((fn) => fn());
     if (!/^#YSchedule-view(?:[?&]|$)/.test(location.hash || "")) return;
     const bar = filterBarElement();
     if (!bar) return;
     tickCallbacks.forEach((fn) => fn(bar));
   }
 
-  window.__tssregShared = { filterBarElement, onScheduleTick, registerModuleFilter, chunk, fetchJson };
+  window.__tssregShared = {
+    filterBarElement,
+    onScheduleTick,
+    onUiUpdated,
+    registerModuleFilter,
+    chunk,
+    fetchJson,
+  };
 
   patchNetwork();
   sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {

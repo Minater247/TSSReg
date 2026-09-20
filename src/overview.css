@@ -1,0 +1,115 @@
+#tssreg-week-strip {
+  --tssreg-border: #e5e5e5;
+  --tssreg-bg: #ffffff;
+  --tssreg-accent: #0a6ed1;
+  --tssreg-text: #131e29;
+  --tssreg-muted: #556b82;
+  --tssreg-event-bg: #f2f7fa;
+  padding: 0 0.5rem 0.5rem;
+}
+
+#tssreg-week-strip .tssreg-week-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0 0.75rem;
+}
+
+#tssreg-week-strip .tssreg-week-nav-title {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+#tssreg-week-strip .tssreg-week-nav-title .sapMTitle {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+#tssreg-week-strip .tssreg-week-scroll {
+  overflow-x: auto;
+}
+
+#tssreg-week-strip .tssreg-week-day {
+  border: 1px solid var(--tssreg-border);
+  border-radius: 8px;
+  background: var(--tssreg-bg);
+  padding: 10px 8px;
+  min-height: 80px;
+  box-sizing: border-box;
+  gap: 6px;
+}
+
+#tssreg-week-strip .tssreg-week-day.tssreg-is-today {
+  border-width: 2px;
+  border-color: var(--tssreg-accent);
+  padding: 9px 7px;
+}
+
+#tssreg-week-strip .tssreg-week-dayname .sapMText {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--tssreg-text);
+}
+
+#tssreg-week-strip .tssreg-week-event {
+  background: var(--tssreg-event-bg);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+#tssreg-week-strip .tssreg-week-room {
+  margin-top: 2px;
+}
+
+#tssreg-week-strip .tssreg-week-time .sapMText,
+#tssreg-week-strip .tssreg-week-room .sapMText {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--tssreg-muted);
+}
+
+#tssreg-week-strip .tssreg-week-name .sapMText {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--tssreg-text);
+}
+
+#tssreg-week-strip .tssreg-week-badge {
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+#tssreg-week-strip .tssreg-week-badge .sapMText {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+#tssreg-week-strip .tssreg-week-foot {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.75rem;
+}
+
+#tssreg-week-strip .tssreg-week-legend {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+#tssreg-week-strip .tssreg-week-legend .sapMText {
+  font-size: 13px;
+  color: var(--tssreg-muted);
+}
+
+#tssreg-week-strip .tssreg-week-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
