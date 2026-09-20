@@ -45,6 +45,19 @@ button[id$="-btnAdapt"] {
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::seatsAvailable-label"]) { order: 25; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::FilterField::wishlisted-label"]) { order: 26; }
 .sapUiMdcFilterBarBase .sapUiAFLayoutItem:has([id$="::CustomFilterField::Credits-label"]) { order: 27; }
+#tssreg-timeofday-item {
+  order: 28;
+  flex: 1 0 12rem;
+  max-width: 24rem;
+  display: block;
+  height: auto !important;
+  margin-left: 0 !important;
+  margin-top: 8px !important;
+}
+
+[id$="--idCreditsRangeSlider"] .sapMSliderTickLabel {
+  display: none !important;
+}
 
 .sapUiMdcFilterBarBase .sapUiAFLayoutEnd {
   order: 1000;
@@ -67,6 +80,24 @@ button[id$="-btnAdapt"] {
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::seatsAvailable-label"]),
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::FilterField::wishlisted-label"]),
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) .sapUiAFLayoutItem:has([id$="::CustomFilterField::Credits-label"]),
+.sapUiMdcFilterBarBase:not(.tssreg-expanded) #tssreg-timeofday-item,
 .sapUiMdcFilterBarBase:not(.tssreg-expanded) #tssreg-soc-separator {
   display: none !important;
+}
+
+#tssreg-timeofday-item .sapUiVlt,
+#tssreg-timeofday-item .sapUiVltCell,
+#tssreg-timeofday-item .sapUiMdcFieldBase,
+#tssreg-timeofday-item .tssreg-time-mount {
+  display: block;
+  width: 100%;
+}
+
+#tssreg-timeofday-item .sapMSliderTickLabel {
+  display: none !important;
+}
+
+.tssreg-time-caption {
+  display: block;
+  margin-top: 0.25rem;
 }
