@@ -11,9 +11,23 @@
   color: var(--tssreg-text);
 }
 
-.tssreg-cal .tssreg-cal-legend {
+.tssreg-cal .tssreg-cal-toolbar {
   gap: 16px;
   padding: 4px 4px 10px;
+  row-gap: 8px;
+}
+
+.tssreg-cal .tssreg-cal-plan {
+  gap: 8px;
+}
+
+.tssreg-cal .tssreg-cal-plan-label.sapMLabel {
+  font-size: 0.8125rem !important;
+  font-weight: 600;
+}
+
+.tssreg-cal .tssreg-cal-legend {
+  gap: 16px;
 }
 
 .tssreg-cal .tssreg-cal-legend-item {
@@ -166,6 +180,12 @@
   border: 1px solid #7fcccc;
 }
 
+.tssreg-cal .tssreg-cal-status-planned {
+  background-color: #ffffff;
+  color: #767676;
+  border: 1px dashed #a0a0a0;
+}
+
 .tssreg-cal .tssreg-cal-status-other {
   background-color: #eeeeee;
   color: #333333;
@@ -243,4 +263,160 @@
 .tssreg-detail-popover .tssreg-detail-divider {
   border-top: 1px solid var(--tssreg-border, #e5e5e5);
   margin: 8px 0;
+}
+
+.tssreg-plan-dialog {
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.sapMPanel.tssreg-find {
+  --tssreg-find-border: #e5e5e5;
+  --tssreg-find-muted: #556b82;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+.tssreg-find .tssreg-find-bar {
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+}
+
+.tssreg-find .tssreg-find-bar .sapUiAFLayoutItem {
+  margin: 8px 4px 0;
+  padding: 0 4px;
+}
+
+.tssreg-find .tssreg-find-bar .sapUiAFLayoutSpacer {
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+.tssreg-find .tssreg-find-bar .sapUiAFLayoutEnd {
+  order: 1000;
+  position: static !important;
+  flex-grow: 0 !important;
+  flex-basis: 100% !important;
+  margin: 8px 0 0 auto !important;
+  padding: 0 4px;
+}
+
+.tssreg-find .tssreg-find-bar .sapUiAFLayoutItem:has(#tssreg-find-separator) {
+  flex-basis: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.tssreg-find #tssreg-find-separator {
+  border: none;
+  border-top: 1px solid #999999;
+  margin: 16px 0 8px 0;
+}
+
+.tssreg-find .tssreg-find-bar:not(.tssreg-expanded) .sapUiAFLayoutItem:has(.tssreg-find-advanced) {
+  display: none !important;
+}
+
+.tssreg-find .tssreg-find-readout.sapMText {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--tssreg-find-muted) !important;
+}
+
+.tssreg-find .tssreg-find-pills {
+  gap: 4px;
+}
+
+.tssreg-find .tssreg-find-pill.sapMBtn {
+  min-width: 2rem;
+  margin: 0;
+}
+
+.tssreg-find .tssreg-find-busy {
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.tssreg-find .tssreg-find-message.sapMText {
+  color: var(--tssreg-find-muted) !important;
+  padding: 10px 0;
+}
+
+.tssreg-find .tssreg-find-message-error.sapMText {
+  color: #bb0000 !important;
+}
+
+.tssreg-find .tssreg-find-results {
+  gap: 18px;
+}
+
+.tssreg-find .tssreg-find-course {
+  border: 1px solid var(--tssreg-find-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tssreg-find .tssreg-find-course-head {
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--tssreg-find-border);
+}
+
+.tssreg-find .tssreg-find-course-code.sapMText {
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.tssreg-find .tssreg-find-course-title.sapMText {
+  flex: 1 1 auto;
+}
+
+.tssreg-find .tssreg-find-course-meta.sapMText {
+  font-size: 0.8125rem !important;
+  color: var(--tssreg-find-muted) !important;
+  flex: 0 0 auto;
+}
+
+.tssreg-find .tssreg-find-pkg-bar.sapMTB {
+  background: transparent;
+  border-bottom: 1px solid var(--tssreg-find-border);
+}
+
+.tssreg-find .tssreg-find-pkg-label.sapMText {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.tssreg-find .tssreg-find-table .sapMListTblHeader,
+.tssreg-find .tssreg-find-table .sapMListTblRow {
+  font-size: 0.8125rem;
+}
+
+.tssreg-find .sapMSliderLabels,
+.tssreg-find .sapMSliderTickLabel {
+  display: none !important;
+}
+
+.tssreg-find .tssreg-find-bar .sapUiAFLayoutItem:has(.tssreg-find-pair) {
+  flex-basis: max-content !important;
+  flex-grow: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.tssreg-find .tssreg-find-pair {
+  column-gap: 2rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.tssreg-find .tssreg-find-pair > .tssreg-find-field {
+  flex: 0 0 auto !important;
+  width: max-content !important;
+}
+
+.tssreg-find .tssreg-find-bar .sapUiAFLayoutItem:has(.tssreg-find-slider) {
+  flex-basis: 24rem !important;
 }

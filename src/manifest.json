@@ -52,7 +52,10 @@
         "overview-calendar.js",
         "overview-identity.js",
         "overview-quicklinks.js",
-        "courses-calendar.js"
+        "courses-plans.js",
+        "courses-catalog.js",
+        "courses-calendar.js",
+        "courses-finder.js"
       ],
       "world": "MAIN",
       "run_at": "document_idle"

@@ -2,16 +2,18 @@
   const ROOT_ID = "tssreg-courses-calendar";
   const LOADING_ID = "tssreg-courses-loading";
   const POPOVER_ID = "tssreg-courses-detail";
+  const FINDER_ID = "tssreg-courses-finder";
   const PAGE_SELECTOR = '[id$="--mymodulesPage"]';
   const LIST_SUFFIX = /--mymodList$/;
   const HIDDEN_CLASS = "tssreg-native-list-hidden";
-  const FILTER_ICON = "sap-icon://filter";
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
+  const SOC_ROUTE = "#YSchedule-view";
+  const ITEMS_EVENT = "tssreg:schedule-items";
   const DAY_NAMES = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const WEEKDAYS = ["MO", "TU", "WE", "TH", "FR"];
   const DAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
-  const STATUS_LABEL = { enrolled: "Enrolled", waitlisted: "Waitlisted", other: "" };
-  const LEGEND_ORDER = ["enrolled", "waitlisted", "other"];
+  const STATUS_LABEL = { enrolled: "Enrolled", waitlisted: "Waitlisted", planned: "Planned", other: "" };
+  const LEGEND_ORDER = ["enrolled", "waitlisted", "planned", "other"];
   const MIN_BLOCK_HEIGHT = 66;
   const BREATHING_ROOM = 14;
   const TRACK_SLACK = 12;
@@ -23,12 +25,15 @@
     ["--tssreg-muted", "sapUiContentLabelColor", "#556b82"],
   ];
 
+  const plans = window.__tssregShared.plans;
   let modules = null;
   const eventsByPackage = {};
   const pending = {};
   let rendered = null;
   let layout = null;
   let openBlockKey = null;
+  let publishedItems = null;
+  let publishedSignature = null;
 
   sap.ui.require(
     [
@@ -42,10 +47,18 @@
       "sap/m/Toolbar",
       "sap/m/ToolbarSpacer",
       "sap/m/ProgressIndicator",
+      "sap/m/Select",
+      "sap/m/MenuButton",
+      "sap/m/Menu",
+      "sap/m/MenuItem",
+      "sap/m/Dialog",
+      "sap/m/Input",
+      "sap/m/MessageBox",
+      "sap/ui/core/Item",
       "sap/ui/core/HTML",
     ],
-    (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, HTML) => {
-      modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, HTML };
+    (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, Select, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, Item, HTML) => {
+      modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, Select, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, Item, HTML };
     }
   );
 
@@ -67,17 +80,12 @@
   function moduleEntries(list) {
     const binding = list.getBinding && list.getBinding("items");
     if (!binding || !binding.getCurrentContexts) return null;
+    if (binding.isLengthFinal && !binding.isLengthFinal()) return null;
     const model = binding.getModel();
-    const entries = binding
+    return binding
       .getCurrentContexts()
       .map((context) => ({ path: context.getPath(), row: context.getObject(), model }))
       .filter((entry) => entry.row && entry.row.EventPackageId);
-    return entries.length ? entries : null;
-  }
-
-  function toolbarControls(list) {
-    const toolbar = list.getHeaderToolbar && list.getHeaderToolbar();
-    return toolbar ? toolbar.getContent() : [];
   }
 
   function setNativeListHidden(list, hidden) {
@@ -85,13 +93,8 @@
       if (hidden) list.addStyleClass(HIDDEN_CLASS);
       else list.removeStyleClass(HIDDEN_CLASS);
     }
-    toolbarControls(list).forEach((control) => {
-      const isSearch = control.isA && control.isA("sap.m.SearchField");
-      const isFilter = control.getIcon && control.getIcon() === FILTER_ICON;
-      if (!isSearch && !isFilter) return;
-      if (control.getVisible() === !hidden) return;
-      control.setVisible(!hidden);
-    });
+    const toolbar = list.getHeaderToolbar && list.getHeaderToolbar();
+    if (toolbar && toolbar.getVisible() === hidden) toolbar.setVisible(!hidden);
   }
 
   function ensureEvents(entries) {
@@ -223,6 +226,7 @@
               section: event.EventStext || "",
               method: event.MethodText || event.Method || "",
               room: event.RoomShort || "",
+              roomFull: roomLabel(event),
               instructor: event.InstrText || "",
               event,
               row,
@@ -233,10 +237,91 @@
     return items;
   }
 
-  function layoutDay(dayItems) {
-    const sorted = dayItems.slice().sort((a, b) => a.startMin - b.startMin);
-    const columnEnds = [];
+  function odataLiteral(value) {
+    return "'" + String(value).replace(/'/g, "''") + "'";
+  }
+
+  function courseRoute(section) {
+    if (!section.year || !section.term) return SOC_ROUTE;
+    return (
+      SOC_ROUTE +
+      "&/YUCSD_CON_MODULE(AcademicYear=" +
+      odataLiteral(section.year) +
+      ",AcademicPeriod=" +
+      odataLiteral(section.term) +
+      ",ModuleID=" +
+      odataLiteral(section.moduleId) +
+      ")?layout=TwoColumnsMidExpanded"
+    );
+  }
+
+  function plannedMeetingLabel(component) {
+    const groups = {};
+    (component.meetings || []).forEach((meeting) => {
+      const key = meeting.startMin + "-" + meeting.endMin;
+      if (!groups[key]) groups[key] = { startMin: meeting.startMin, endMin: meeting.endMin, days: [] };
+      groups[key].days.push(meeting.day);
+    });
+    return Object.keys(groups)
+      .map((key) => groups[key])
+      .sort((a, b) => a.startMin - b.startMin)
+      .map((group) => {
+        const days = DAY_ORDER.filter((day) => group.days.indexOf(day) !== -1)
+          .map((day) => DAY_NAMES[day])
+          .join("/");
+        return [days, fullRangeLabel(group.startMin, group.endMin)].filter(Boolean).join(" ");
+      })
+      .join("\n");
+  }
+
+  function plannedItems() {
+    const plan = plans.current();
+    if (!plan) return [];
+    const items = [];
+    plan.sections.forEach((section) => {
+      section.components.forEach((component, index) => {
+        component.meetings.forEach((meeting) => {
+          items.push({
+            key: "plan|" + section.moduleId + "|" + section.pkgId + "|" + index,
+            day: meeting.day,
+            startMin: meeting.startMin,
+            endMin: meeting.endMin,
+            status: "planned",
+            courseCode: section.courseCode,
+            courseTitle: section.title,
+            section: component.abbr,
+            method: component.type,
+            room: component.location,
+            roomFull: component.location,
+            instructor: component.instructor,
+            planned: { section, component },
+          });
+        });
+      });
+    });
+    return items;
+  }
+
+  function overlapClusters(sorted) {
+    const clusters = [];
+    let current = null;
+    let clusterEnd = -1;
     sorted.forEach((item) => {
+      if (!current || item.startMin >= clusterEnd) {
+        current = [];
+        clusters.push(current);
+        clusterEnd = item.endMin;
+      } else if (item.endMin > clusterEnd) {
+        clusterEnd = item.endMin;
+      }
+      current.push(item);
+    });
+    return clusters;
+  }
+
+  function layoutCluster(cluster) {
+    const columnEnds = [];
+    cluster.forEach((item) => {
       const free = columnEnds.findIndex((end) => end <= item.startMin);
       if (free === -1) {
         item.column = columnEnds.length;
@@ -246,17 +331,22 @@
       columnEnds[free] = item.endMin;
       item.column = free;
     });
-    sorted.forEach((item) => {
+    cluster.forEach((item) => {
       item.columns = columnEnds.length;
     });
-    sorted.forEach((a, index) => {
-      sorted.slice(index + 1).forEach((b) => {
+    cluster.forEach((a, index) => {
+      cluster.slice(index + 1).forEach((b) => {
         if (a.startMin < b.endMin && b.startMin < a.endMin) {
           a.conflict = true;
           b.conflict = true;
         }
       });
     });
+  }
+
+  function layoutDay(dayItems) {
+    const sorted = dayItems.slice().sort((a, b) => a.startMin - b.startMin);
+    overlapClusters(sorted).forEach(layoutCluster);
     return sorted;
   }
 
@@ -324,7 +414,31 @@
     return [times, dates].filter(Boolean).join("\n");
   }
 
-  function detailContent(item) {
+  function detailBox(content) {
+    const box = new modules.VBox({ renderType: "Bare", items: content.filter(Boolean) });
+    box.addStyleClass("tssreg-detail");
+    return box;
+  }
+
+  function plannedContent(item) {
+    const section = item.planned.section;
+    const component = item.planned.component;
+    const content = [];
+    content.push(detailRow("Meeting Times", plannedMeetingLabel(component)));
+    content.push(detailRow("Location", component.location));
+    content.push(detailRow("Instructor", component.instructor));
+    if (section.components.length > 1) {
+      const types = section.components.map((entry) => entry.type).filter(Boolean).join(", ");
+      content.push(
+        detailRow("Package", section.components.length + " components" + (types ? " (" + types + ")" : ""))
+      );
+    }
+    content.push(detailRow("Credits", section.credits));
+    content.push(detailRow("Status", "Planned \u2014 not enrolled"));
+    return detailBox(content);
+  }
+
+  function enrolledContent(item) {
     const event = item.event;
     const row = item.row;
     const route = detailRoute(row);
@@ -349,16 +463,49 @@
     );
     content.push(detailRow("Event Package Name", row.EventPackageName));
 
-    const box = new modules.VBox({ renderType: "Bare", items: content.filter(Boolean) });
-    box.addStyleClass("tssreg-detail");
-    return box;
+    return detailBox(content);
+  }
+
+  function detailContent(item) {
+    return item.planned ? plannedContent(item) : enrolledContent(item);
   }
 
   function canWithdraw(item) {
     return !!item.event.WithdrawBtnEnable && !item.row.CancelNotAllowed && !item.row.Lockflag;
   }
 
-  function detailFooter(item) {
+  function plannedFooter(item) {
+    const section = item.planned.section;
+    const types = section.components.map((entry) => entry.type).filter(Boolean).join(", ");
+    return new modules.Toolbar({
+      content: [
+        new modules.ToolbarSpacer(),
+        new modules.Button({
+          text: "Enroll",
+          type: "Emphasized",
+          tooltip: "Open this course in the Schedule of Classes to enroll.",
+          press: () => {
+            closePopover();
+            location.hash = courseRoute(section);
+          },
+        }),
+        new modules.Button({
+          text: "Remove",
+          type: "Reject",
+          tooltip:
+            section.components.length > 1
+              ? "Removes the whole package" + (types ? " (" + types + ")" : "") + ", not just this meeting."
+              : "Remove this course from the schedule.",
+          press: () => {
+            closePopover();
+            plans.removeSection(section.moduleId, section.pkgId);
+          },
+        }),
+      ],
+    });
+  }
+
+  function enrolledFooter(item) {
     const route = detailRoute(item.row);
     const go = () => {
       closePopover();
@@ -374,6 +521,10 @@
       );
     }
     return new modules.Toolbar({ content });
+  }
+
+  function detailFooter(item) {
+    return item.planned ? plannedFooter(item) : enrolledFooter(item);
   }
 
   function closePopover() {
@@ -425,7 +576,7 @@
     block.addStyleClass("tssreg-cal-block");
     block.addStyleClass("tssreg-cal-status-" + item.status);
     if (item.conflict) block.addStyleClass("tssreg-cal-conflict");
-    block.setTooltip([item.courseTitle, item.section, roomLabel(item.event), item.instructor].filter(Boolean).join("\n"));
+    block.setTooltip([item.courseTitle, item.section, item.roomFull, item.instructor].filter(Boolean).join("\n"));
     const open = () => openPopover(item, block);
     block.addEventDelegate({
       onclick: open,
@@ -470,6 +621,106 @@
     return row;
   }
 
+  function promptFor(title, label, initial, confirmText, onConfirm) {
+    const input = new modules.Input({ value: initial, width: "100%" });
+    const submit = () => {
+      const value = input.getValue().trim();
+      if (!value) return;
+      dialog.close();
+      onConfirm(value);
+    };
+    const caption = new modules.Label({ text: label, labelFor: input });
+    const dialog = new modules.Dialog({
+      title,
+      contentWidth: "20rem",
+      content: [new modules.VBox({ renderType: "Bare", items: [caption, input] }).addStyleClass("tssreg-plan-dialog")],
+      beginButton: new modules.Button({ text: confirmText, type: "Emphasized", press: submit }),
+      endButton: new modules.Button({ text: "Cancel", press: () => dialog.close() }),
+      afterClose: () => dialog.destroy(),
+    });
+    input.attachSubmit(submit);
+    dialog.open();
+  }
+
+  function confirmDelete(plan) {
+    modules.MessageBox.confirm("Delete the schedule \u201c" + plan.name + "\u201d?", {
+      title: "Delete Schedule",
+      actions: [modules.MessageBox.Action.DELETE, modules.MessageBox.Action.CANCEL],
+      emphasizedAction: modules.MessageBox.Action.DELETE,
+      onClose: (action) => {
+        if (action === modules.MessageBox.Action.DELETE) plans.remove(plan);
+      },
+    });
+  }
+
+  function planMenu(plan) {
+    const items = [
+      new modules.MenuItem({
+        text: "New schedule",
+        icon: "sap-icon://add",
+        press: () => promptFor("New Schedule", "Name", plans.defaultName(), "Create", (name) => plans.create(name)),
+      }),
+    ];
+    if (plan) {
+      items.push(
+        new modules.MenuItem({
+          text: "Duplicate",
+          icon: "sap-icon://copy",
+          press: () => promptFor("Duplicate Schedule", "Name", plan.name + " copy", "Duplicate", (name) => plans.duplicate(plan, name)),
+        }),
+        new modules.MenuItem({
+          text: "Rename",
+          icon: "sap-icon://edit",
+          press: () => promptFor("Rename Schedule", "Name", plan.name, "Rename", (name) => plans.rename(plan, name)),
+        }),
+        new modules.MenuItem({
+          text: "Delete",
+          icon: "sap-icon://delete",
+          press: () => confirmDelete(plan),
+        })
+      );
+    }
+    return new modules.Menu({ items });
+  }
+
+  function planControls() {
+    const plan = plans.current();
+    const all = plans.list();
+    const caption = new modules.Label({ text: "My Schedule:" });
+    caption.addStyleClass("tssreg-cal-plan-label");
+    const select = new modules.Select({
+      width: "12rem",
+      items: all.length
+        ? all.map((entry) => new modules.Item({ key: entry.id, text: entry.name + " (" + entry.sections.length + ")" }))
+        : [new modules.Item({ key: "", text: "No schedule yet" })],
+      selectedKey: plan ? plan.id : "",
+      enabled: all.length > 0,
+      change: (event) => {
+        const selected = event.getParameter("selectedItem");
+        const key = selected && selected.getKey();
+        if (key) plans.select(key);
+      },
+    });
+    select.addStyleClass("tssreg-cal-plan-select");
+    const actions = new modules.MenuButton({
+      icon: "sap-icon://overflow",
+      tooltip: "Schedule actions",
+      buttonMode: "Regular",
+      menu: planMenu(plan),
+    });
+    const box = new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [caption, select, actions] });
+    box.addStyleClass("tssreg-cal-plan");
+    return box;
+  }
+
+  function buildChrome(items) {
+    const bar = new modules.HBox({ renderType: "Bare", alignItems: "Center", wrap: "Wrap" });
+    bar.addStyleClass("tssreg-cal-toolbar");
+    bar.addItem(planControls());
+    bar.addItem(legendControl(items));
+    return bar;
+  }
+
   function hourMarks(range) {
     const marks = [];
     for (let minute = range.startMin; minute <= range.endMin; minute += 60) marks.push(minute);
@@ -511,7 +762,7 @@
     const body = new modules.HBox({ renderType: "Bare", items: [axis, dayRow] });
     body.addStyleClass("tssreg-cal-body");
 
-    const root = new modules.VBox(ROOT_ID, { renderType: "Bare", items: [legendControl(items), body] });
+    const root = new modules.VBox(ROOT_ID, { renderType: "Bare", items: [buildChrome(items), body] });
     root.addStyleClass("tssreg-cal");
     layout = { range, placed, labels, tracks, axis, root };
     root.addEventDelegate({ onAfterRendering: applyGeometry });
@@ -577,8 +828,31 @@
     });
   }
 
+  function publishItems(items) {
+    const signature = items && JSON.stringify(items.map((item) => [item.day, item.startMin, item.endMin, item.key]));
+    if (signature === publishedSignature) return;
+    publishedSignature = signature;
+    publishedItems = items;
+    window.dispatchEvent(new CustomEvent(ITEMS_EVENT));
+  }
+
+  function busyIntervals() {
+    if (!publishedItems) return null;
+    const byDay = {};
+    publishedItems.forEach((item) => {
+      const list = byDay[item.day] || (byDay[item.day] = []);
+      list.push({
+        startMin: item.startMin,
+        endMin: item.endMin,
+        pkgId: item.planned ? item.planned.section.pkgId : null,
+      });
+    });
+    return byDay;
+  }
+
   function signatureOf(items) {
-    return JSON.stringify(
+    return JSON.stringify([
+      plans.signature(),
       items.map((item) => [
         item.key,
         item.day,
@@ -589,12 +863,14 @@
         item.method,
         item.room,
         item.instructor,
-      ])
-    );
+      ]),
+    ]);
   }
 
   function mountAfterList(page, list, control) {
-    const target = page.indexOfContent(list) + 1;
+    const finder = sap.ui.getCore().byId(FINDER_ID);
+    const anchor = finder && page.indexOfContent(finder) !== -1 ? finder : list;
+    const target = page.indexOfContent(anchor) + 1;
     if (page.indexOfContent(control) !== target) page.insertContent(control, target);
   }
 
@@ -622,16 +898,21 @@
     mountAfterList(page, list, box);
   }
 
-  function teardown() {
+  function destroyCalendar() {
     closePopover();
-    removeLoading();
     const existing = sap.ui.getCore().byId(ROOT_ID);
     if (existing) existing.destroy();
+    layout = null;
+    rendered = null;
+  }
+
+  function teardown() {
+    publishItems(null);
+    removeLoading();
+    destroyCalendar();
     const page = pageControl();
     const list = page && listControl(page);
     if (list) setNativeListHidden(list, false);
-    layout = null;
-    rendered = null;
   }
 
   function apply() {
@@ -643,20 +924,27 @@
     if (!list) return;
 
     const entries = moduleEntries(list);
-    if (!entries) return;
+    if (!entries) return void publishItems(null);
 
-    setNativeListHidden(list, true);
-    ensureEvents(entries);
-
-    const loaded = entries.filter(({ row }) => eventsByPackage[row.EventPackageId]).length;
-    if (loaded < entries.length) return void showLoading(page, list, loaded, entries.length);
+    if (entries.length) {
+      ensureEvents(entries);
+      const loaded = entries.filter(({ row }) => eventsByPackage[row.EventPackageId]).length;
+      if (loaded < entries.length) {
+        setNativeListHidden(list, true);
+        publishItems(null);
+        return void showLoading(page, list, loaded, entries.length);
+      }
+    }
     removeLoading();
 
-    const items = scheduleItems(entries);
+    const items = scheduleItems(entries).concat(plannedItems());
+    publishItems(items);
     if (!items.length) {
       setNativeListHidden(list, false);
+      destroyCalendar();
       return;
     }
+    setNativeListHidden(list, true);
 
     const signature = signatureOf(items);
     let root = sap.ui.getCore().byId(ROOT_ID);
@@ -669,5 +957,8 @@
     mountAfterList(page, list, root);
   }
 
+  window.__tssregShared.schedule = { ITEMS_EVENT, items: () => publishedItems, busyIntervals };
+
   window.__tssregShared.onUiUpdated(apply);
+  window.addEventListener(plans.CHANGE_EVENT, apply);
 })();
