@@ -4,6 +4,7 @@
   "private": true,
   "description": "Chrome/Firefox extension fixing UCSD TSS quirks",
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "test": "node test/load-order.test.js && node test/courses-page.test.js && node test/calendar-layout.test.js && node test/export.test.js"
   }
 }

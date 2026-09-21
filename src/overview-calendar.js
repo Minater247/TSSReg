@@ -1,4 +1,5 @@
 (() => {
+  const shared = window.__tssregShared;
   const CARD = "card12";
   const CARD_TITLE = "My Schedule";
   const STRIP_ID = "tssreg-week-strip";
@@ -41,14 +42,6 @@
       modules = { Parameters, CSSGrid, Text, VBox, HBox, Toolbar, ToolbarSpacer, Button, Title, Link, HTML };
     }
   );
-
-  function isOverviewRoute() {
-    return /^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "");
-  }
-
-  function cardElement() {
-    return document.querySelector('[id*="--' + CARD + 'Original"]');
-  }
 
   function safeColor(value) {
     return /^#[0-9a-fA-F]{3,8}$/.test(String(value || "")) ? value : "#999999";
@@ -297,17 +290,17 @@
   }
 
   function applyCardTitle() {
-    const titleEl = cardElement().querySelector('[id$="ovpHeaderTitle"]');
+    const titleEl = shared.cardElement(CARD).querySelector('[id$="ovpHeaderTitle"]');
     const control = titleEl && sap.ui.getCore().byId(titleEl.id);
     if (control && control.getText && control.getText() !== CARD_TITLE) control.setText(CARD_TITLE);
   }
 
   function apply() {
-    if (!isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute() || !modules) return;
     ensureData();
     if (!byDay) return;
 
-    const cardEl = cardElement();
+    const cardEl = shared.cardElement(CARD);
     const contentEl = cardEl && cardEl.querySelector('[id$="ovpCardContentContainer"]');
     const container = contentEl && sap.ui.getCore().byId(contentEl.id);
     if (!container || !container.getItems) return;
@@ -325,5 +318,5 @@
     applyCardTitle();
   }
 
-  window.__tssregShared.onUiUpdated(apply);
+  shared.onUiUpdated(apply);
 })();

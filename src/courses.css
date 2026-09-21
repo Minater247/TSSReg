@@ -26,8 +26,16 @@
   font-weight: 600;
 }
 
+.tssreg-cal .tssreg-cal-plan-select .sapMBtnInner {
+  justify-content: space-between;
+}
+
 .tssreg-cal .tssreg-cal-legend {
   gap: 16px;
+}
+
+.tssreg-cal .tssreg-cal-export {
+  margin-left: auto;
 }
 
 .tssreg-cal .tssreg-cal-legend-item {

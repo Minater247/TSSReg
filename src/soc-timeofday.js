@@ -1,7 +1,4 @@
 (() => {
-  const SCHED_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_MODULE_SCHED";
-  const ID_CHUNK_SIZE = 40;
   const TIME_MIN = 360;
   const TIME_MAX = 1320;
   const STEP = 30;
@@ -85,23 +82,17 @@
   }
 
   function matchingModuleIds(year, term, ids) {
-    if (!ids.length) return Promise.resolve(new Set());
     const loLiteral = minutesToTimeLiteral(lo);
     const hiLiteral = minutesToTimeLiteral(hi);
-    const urls = window.__tssregShared.chunk(ids, ID_CHUNK_SIZE).map((idChunk) => {
-      const idClause = idChunk.map((id) => "ModuleID eq '" + id + "'").join(" or ");
-      const filter =
-        "AcYear eq '" + year + "' and Acsess eq '" + term + "' and (" + idClause + ")" +
-        " and (BeginTime lt " + loLiteral + " or EndTime gt " + hiLiteral + ")";
-      return SCHED_URL + "?sap-client=500&$top=5000&$select=ModuleID&$filter=" + encodeURIComponent(filter);
-    });
-    return Promise.all(urls.map(window.__tssregShared.fetchJson)).then((results) => {
-      const violating = new Set();
-      results.forEach((data) => {
-        ((data && data.value) || []).forEach((r) => violating.add(r.ModuleID));
-      });
-      return new Set(ids.filter((id) => !violating.has(id)));
-    });
+    return window.__tssregShared
+      .moduleIdSet(
+        "YUCSD_CON_MODULE_SCHED",
+        ids,
+        (idClause) =>
+          "AcYear eq '" + year + "' and Acsess eq '" + term + "' and (" + idClause + ")" +
+          " and (BeginTime lt " + loLiteral + " or EndTime gt " + hiLiteral + ")"
+      )
+      .then((violating) => new Set(ids.filter((id) => !violating.has(id))));
   }
 
   window.__tssregShared.registerModuleFilter({

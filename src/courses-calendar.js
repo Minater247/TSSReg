@@ -3,20 +3,12 @@
   const LOADING_ID = "tssreg-courses-loading";
   const POPOVER_ID = "tssreg-courses-detail";
   const FINDER_ID = "tssreg-courses-finder";
-  const PAGE_SELECTOR = '[id$="--mymodulesPage"]';
-  const LIST_SUFFIX = /--mymodList$/;
   const HIDDEN_CLASS = "tssreg-native-list-hidden";
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
-  const SOC_ROUTE = "#YSchedule-view";
   const ITEMS_EVENT = "tssreg:schedule-items";
-  const DAY_NAMES = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const WEEKDAYS = ["MO", "TU", "WE", "TH", "FR"];
-  const DAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
   const STATUS_LABEL = { enrolled: "Enrolled", waitlisted: "Waitlisted", planned: "Planned", other: "" };
   const LEGEND_ORDER = ["enrolled", "waitlisted", "planned", "other"];
-  const MIN_BLOCK_HEIGHT = 66;
-  const BREATHING_ROOM = 14;
-  const TRACK_SLACK = 12;
   const THEME_VARS = [
     ["--tssreg-border", "sapUiListBorderColor", "#e5e5e5"],
     ["--tssreg-line", "sapUiGroupContentBorderColor", "#f0f0f0"],
@@ -26,9 +18,17 @@
   ];
 
   const plans = window.__tssregShared.plans;
+  const catalog = window.__tssregShared.catalog;
+  const coursesPage = window.__tssregShared.coursesPage;
+  const { MIN_BLOCK_HEIGHT, BREATHING_ROOM, TRACK_SLACK } = window.__tssregShared.scheduleExport;
+  const { DAY_NAMES, DAY_ORDER, isCoursesRoute, pageControl, listControl } = coursesPage;
+  const { rangeLabel, meridiemLabel, fullRangeLabel, dayListLabel } = coursesPage;
   let modules = null;
   const eventsByPackage = {};
+  const meetingsBySection = {};
+  const modulesLoaded = {};
   const pending = {};
+  const pendingModules = {};
   let rendered = null;
   let layout = null;
   let openBlockKey = null;
@@ -47,35 +47,18 @@
       "sap/m/Toolbar",
       "sap/m/ToolbarSpacer",
       "sap/m/ProgressIndicator",
-      "sap/m/Select",
       "sap/m/MenuButton",
       "sap/m/Menu",
       "sap/m/MenuItem",
       "sap/m/Dialog",
       "sap/m/Input",
       "sap/m/MessageBox",
-      "sap/ui/core/Item",
       "sap/ui/core/HTML",
     ],
-    (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, Select, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, Item, HTML) => {
-      modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, Select, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, Item, HTML };
+    (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML) => {
+      modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML };
     }
   );
-
-  function isCoursesRoute() {
-    const hash = location.hash || "";
-    return /\/MyModules$/.test(hash) && hash.indexOf("/Detail/") === -1;
-  }
-
-  function pageControl() {
-    const el = document.querySelector(PAGE_SELECTOR);
-    const page = el ? sap.ui.getCore().byId(el.id) : null;
-    return page && page.getContent ? page : null;
-  }
-
-  function listControl(page) {
-    return page.getContent().filter((control) => LIST_SUFFIX.test(control.getId()))[0] || null;
-  }
 
   function moduleEntries(list) {
     const binding = list.getBinding && list.getBinding("items");
@@ -117,6 +100,50 @@
     });
   }
 
+  function moduleKey(row) {
+    return catalog.scheduleKey(row.AcademicYear, row.AcademicSession, row.SmObjid, "");
+  }
+
+  function ensureMeetings(entries) {
+    const groups = {};
+    entries.forEach(({ row }) => {
+      const id = catalog.plainId(row.SmObjid);
+      const key = moduleKey(row);
+      if (!id || modulesLoaded[key] || pendingModules[key]) return;
+      const term = row.AcademicYear + "|" + row.AcademicSession;
+      const group = groups[term] || (groups[term] = { year: row.AcademicYear, term: row.AcademicSession, ids: [], keys: [] });
+      if (group.ids.indexOf(id) === -1) group.ids.push(id);
+      if (group.keys.indexOf(key) === -1) group.keys.push(key);
+    });
+    Object.keys(groups).forEach((name) => {
+      const group = groups[name];
+      group.keys.forEach((key) => (pendingModules[key] = true));
+      catalog
+        .loadMeetings(group.ids, group.year, group.term)
+        .catch(() => ({}))
+        .then((found) => {
+          Object.keys(found).forEach((key) => (meetingsBySection[key] = found[key]));
+          group.keys.forEach((key) => {
+            delete pendingModules[key];
+            modulesLoaded[key] = true;
+          });
+          apply();
+        });
+    });
+  }
+
+  function meetingsFor(row, event) {
+    const found = meetingsBySection[catalog.scheduleKey(row.AcademicYear, row.AcademicSession, row.SmObjid, event.EventId)];
+    if (found && found.length) return found;
+    const startMin = minutesOf(event.StartTime);
+    const endMin = minutesOf(event.EndTime);
+    if (startMin == null || endMin == null || endMin <= startMin) return [];
+    return String(event.EventScheduleDays || "")
+      .split("/")
+      .filter((day) => DAY_NAMES[day])
+      .map((day) => ({ day, startMin, endMin }));
+  }
+
   function statusOf(row) {
     const text = ((row.SmStatusText || "") + " " + (row.SmStatus || "")).toLowerCase();
     if (text.indexOf("wait") !== -1) return "waitlisted";
@@ -126,31 +153,6 @@
 
   function minutesOf(time) {
     return time && typeof time.ms === "number" ? Math.round(time.ms / 60000) : null;
-  }
-
-  function clockLabel(minutes) {
-    const hours = Math.floor(minutes / 60);
-    return (hours % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0");
-  }
-
-  function rangeLabel(startMin, endMin) {
-    return clockLabel(startMin) + " – " + clockLabel(endMin);
-  }
-
-  function meridiemLabel(minutes) {
-    return clockLabel(minutes) + (minutes >= 720 ? " PM" : " AM");
-  }
-
-  function fullRangeLabel(startMin, endMin) {
-    return meridiemLabel(startMin) + " – " + meridiemLabel(endMin);
-  }
-
-  function dayListLabel(scheduleDays) {
-    return String(scheduleDays || "")
-      .split("/")
-      .filter(Boolean)
-      .map((day) => DAY_NAMES[day] || day)
-      .join("/");
   }
 
   function roomLabel(event) {
@@ -208,70 +210,27 @@
       if (!events) return;
       const status = statusOf(row);
       events.forEach((event) => {
-        const startMin = minutesOf(event.StartTime);
-        const endMin = minutesOf(event.EndTime);
-        if (startMin == null || endMin == null || endMin <= startMin) return;
-        String(event.EventScheduleDays || "")
-          .split("/")
-          .filter((day) => DAY_NAMES[day])
-          .forEach((day) => {
-            items.push({
-              key: row.EventPackageId + "|" + event.EventId,
-              day,
-              startMin,
-              endMin,
-              status,
-              courseCode: row.SmShort || "",
-              courseTitle: row.SmStext || "",
-              section: event.EventStext || "",
-              method: event.MethodText || event.Method || "",
-              room: event.RoomShort || "",
-              roomFull: roomLabel(event),
-              instructor: event.InstrText || "",
-              event,
-              row,
-            });
+        meetingsFor(row, event).forEach(({ day, startMin, endMin }) => {
+          items.push({
+            key: row.EventPackageId + "|" + event.EventId,
+            day,
+            startMin,
+            endMin,
+            status,
+            courseCode: row.SmShort || "",
+            courseTitle: row.SmStext || "",
+            section: event.EventStext || "",
+            method: event.MethodText || event.Method || "",
+            room: event.RoomShort || "",
+            roomFull: roomLabel(event),
+            instructor: event.InstrText || "",
+            event,
+            row,
           });
+        });
       });
     });
     return items;
-  }
-
-  function odataLiteral(value) {
-    return "'" + String(value).replace(/'/g, "''") + "'";
-  }
-
-  function courseRoute(section) {
-    if (!section.year || !section.term) return SOC_ROUTE;
-    return (
-      SOC_ROUTE +
-      "&/YUCSD_CON_MODULE(AcademicYear=" +
-      odataLiteral(section.year) +
-      ",AcademicPeriod=" +
-      odataLiteral(section.term) +
-      ",ModuleID=" +
-      odataLiteral(section.moduleId) +
-      ")?layout=TwoColumnsMidExpanded"
-    );
-  }
-
-  function plannedMeetingLabel(component) {
-    const groups = {};
-    (component.meetings || []).forEach((meeting) => {
-      const key = meeting.startMin + "-" + meeting.endMin;
-      if (!groups[key]) groups[key] = { startMin: meeting.startMin, endMin: meeting.endMin, days: [] };
-      groups[key].days.push(meeting.day);
-    });
-    return Object.keys(groups)
-      .map((key) => groups[key])
-      .sort((a, b) => a.startMin - b.startMin)
-      .map((group) => {
-        const days = DAY_ORDER.filter((day) => group.days.indexOf(day) !== -1)
-          .map((day) => DAY_NAMES[day])
-          .join("/");
-        return [days, fullRangeLabel(group.startMin, group.endMin)].filter(Boolean).join(" ");
-      })
-      .join("\n");
   }
 
   function plannedItems() {
@@ -424,7 +383,7 @@
     const section = item.planned.section;
     const component = item.planned.component;
     const content = [];
-    content.push(detailRow("Meeting Times", plannedMeetingLabel(component)));
+    content.push(detailRow("Meeting Times", coursesPage.meetingLabel(component.meetings)));
     content.push(detailRow("Location", component.location));
     content.push(detailRow("Instructor", component.instructor));
     if (section.components.length > 1) {
@@ -486,7 +445,7 @@
           tooltip: "Open this course in the Schedule of Classes to enroll.",
           press: () => {
             closePopover();
-            location.hash = courseRoute(section);
+            location.hash = coursesPage.courseRoute(section.year, section.term, section.moduleId);
           },
         }),
         new modules.Button({
@@ -605,19 +564,32 @@
     return entry;
   }
 
-  function legendControl(items) {
+  function legendModel(items) {
     const present = {};
     let conflict = false;
     items.forEach((item) => {
       present[item.status] = true;
       if (item.conflict) conflict = true;
     });
+    const entries = LEGEND_ORDER.filter((status) => present[status] && STATUS_LABEL[status]).map((status) => ({
+      status,
+      label: STATUS_LABEL[status],
+    }));
+    if (conflict) entries.push({ status: "conflict", label: "Time conflict" });
+    return entries;
+  }
+
+  function legendControl(items) {
     const row = new modules.HBox({ renderType: "Bare", alignItems: "Center", wrap: "Wrap" });
     row.addStyleClass("tssreg-cal-legend");
-    LEGEND_ORDER.filter((status) => present[status] && STATUS_LABEL[status]).forEach((status) =>
-      row.addItem(legendEntry("tssreg-cal-status-" + status, STATUS_LABEL[status]))
+    legendModel(items).forEach((entry) =>
+      row.addItem(
+        legendEntry(
+          entry.status === "conflict" ? "tssreg-cal-swatch-conflict" : "tssreg-cal-status-" + entry.status,
+          entry.label
+        )
+      )
     );
-    if (conflict) row.addItem(legendEntry("tssreg-cal-swatch-conflict", "Time conflict"));
     return row;
   }
 
@@ -653,14 +625,27 @@
     });
   }
 
-  function planMenu(plan) {
-    const items = [
+  function planLabel(plan) {
+    return plan.name + " (" + plan.sections.length + ")";
+  }
+
+  function planMenu(plan, all) {
+    const items = all.map(
+      (entry) =>
+        new modules.MenuItem({
+          text: planLabel(entry),
+          icon: plan && entry.id === plan.id ? "sap-icon://accept" : "",
+          press: () => plans.select(entry.id),
+        })
+    );
+    items.push(
       new modules.MenuItem({
         text: "New schedule",
         icon: "sap-icon://add",
+        startsSection: items.length > 0,
         press: () => promptFor("New Schedule", "Name", plans.defaultName(), "Create", (name) => plans.create(name)),
-      }),
-    ];
+      })
+    );
     if (plan) {
       items.push(
         new modules.MenuItem({
@@ -688,29 +673,55 @@
     const all = plans.list();
     const caption = new modules.Label({ text: "My Schedule:" });
     caption.addStyleClass("tssreg-cal-plan-label");
-    const select = new modules.Select({
+    const picker = new modules.MenuButton({
+      text: plan ? planLabel(plan) : "No schedule yet",
       width: "12rem",
-      items: all.length
-        ? all.map((entry) => new modules.Item({ key: entry.id, text: entry.name + " (" + entry.sections.length + ")" }))
-        : [new modules.Item({ key: "", text: "No schedule yet" })],
-      selectedKey: plan ? plan.id : "",
-      enabled: all.length > 0,
-      change: (event) => {
-        const selected = event.getParameter("selectedItem");
-        const key = selected && selected.getKey();
-        if (key) plans.select(key);
-      },
-    });
-    select.addStyleClass("tssreg-cal-plan-select");
-    const actions = new modules.MenuButton({
-      icon: "sap-icon://overflow",
-      tooltip: "Schedule actions",
       buttonMode: "Regular",
-      menu: planMenu(plan),
+      menu: planMenu(plan, all),
     });
-    const box = new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [caption, select, actions] });
+    picker.addStyleClass("tssreg-cal-plan-select");
+    caption.setLabelFor(picker);
+    const box = new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [caption, picker] });
     box.addStyleClass("tssreg-cal-plan");
     return box;
+  }
+
+  function exportModel() {
+    if (!layout) return null;
+    const plan = plans.current();
+    const items = layout.placed.map(({ item }) => ({
+      day: item.day,
+      startMin: item.startMin,
+      endMin: item.endMin,
+      column: item.column,
+      columns: item.columns,
+      conflict: !!item.conflict,
+      status: item.status,
+      timeLabel: rangeLabel(item.startMin, item.endMin),
+      statusLabel: STATUS_LABEL[item.status] || "",
+      title: item.courseCode || item.courseTitle,
+      meta: [item.method, item.room].filter(Boolean).join(" / "),
+      instructor: item.instructor || "",
+    }));
+    return {
+      planName: plan ? plan.name : "",
+      range: layout.range,
+      days: layout.days.map((day) => ({ key: day, label: DAY_NAMES[day] })),
+      hours: hourMarks(layout.range).map((minute) => ({ minute, label: meridiemLabel(minute) })),
+      legend: legendModel(items),
+      items,
+    };
+  }
+
+  function exportButton() {
+    const button = new modules.Button({
+      text: "Export Schedule",
+      icon: "sap-icon://download",
+      tooltip: "Save the schedule shown here as a PNG image.",
+      press: () => window.__tssregShared.scheduleExport.download(exportModel()),
+    });
+    button.addStyleClass("tssreg-cal-export");
+    return button;
   }
 
   function buildChrome(items) {
@@ -718,6 +729,7 @@
     bar.addStyleClass("tssreg-cal-toolbar");
     bar.addItem(planControls());
     bar.addItem(legendControl(items));
+    bar.addItem(exportButton());
     return bar;
   }
 
@@ -764,7 +776,7 @@
 
     const root = new modules.VBox(ROOT_ID, { renderType: "Bare", items: [buildChrome(items), body] });
     root.addStyleClass("tssreg-cal");
-    layout = { range, placed, labels, tracks, axis, root };
+    layout = { range, days, placed, labels, tracks, axis, root };
     root.addEventDelegate({ onAfterRendering: applyGeometry });
     return root;
   }
@@ -867,13 +879,6 @@
     ]);
   }
 
-  function mountAfterList(page, list, control) {
-    const finder = sap.ui.getCore().byId(FINDER_ID);
-    const anchor = finder && page.indexOfContent(finder) !== -1 ? finder : list;
-    const target = page.indexOfContent(anchor) + 1;
-    if (page.indexOfContent(control) !== target) page.insertContent(control, target);
-  }
-
   function removeLoading() {
     const loading = sap.ui.getCore().byId(LOADING_ID);
     if (loading) loading.destroy();
@@ -895,7 +900,7 @@
       box.getItems()[0].setText(text);
     }
     box.getItems()[1].setPercentValue(total ? Math.round((loaded / total) * 100) : 0);
-    mountAfterList(page, list, box);
+    coursesPage.mountAfterList(page, list, box, FINDER_ID);
   }
 
   function destroyCalendar() {
@@ -928,7 +933,10 @@
 
     if (entries.length) {
       ensureEvents(entries);
-      const loaded = entries.filter(({ row }) => eventsByPackage[row.EventPackageId]).length;
+      ensureMeetings(entries);
+      const loaded = entries.filter(
+        ({ row }) => eventsByPackage[row.EventPackageId] && modulesLoaded[moduleKey(row)]
+      ).length;
       if (loaded < entries.length) {
         setNativeListHidden(list, true);
         publishItems(null);
@@ -954,7 +962,7 @@
       root = buildCalendar(items);
       rendered = signature;
     }
-    mountAfterList(page, list, root);
+    coursesPage.mountAfterList(page, list, root, FINDER_ID);
   }
 
   window.__tssregShared.schedule = { ITEMS_EVENT, items: () => publishedItems, busyIntervals };

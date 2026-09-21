@@ -1,7 +1,4 @@
 (() => {
-  const EVENTS_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_EVENTS";
-  const ID_CHUNK_SIZE = 40;
   const MODES = [
     ["any", "Any"],
     ["open", "Open"],
@@ -73,21 +70,13 @@
   }
 
   function matchingModuleIds(year, term, ids) {
-    if (!ids.length) return Promise.resolve(new Set());
-    const urls = window.__tssregShared.chunk(ids, ID_CHUNK_SIZE).map((idChunk) => {
-      const idClause = idChunk.map((id) => "ModuleID eq '" + id + "'").join(" or ");
-      const filter =
+    return window.__tssregShared.moduleIdSet(
+      "YUCSD_CON_EVENTS",
+      ids,
+      (idClause) =>
         "AcYear eq '" + year + "' and AcPeriod eq '" + term + "' and (" + idClause + ")" +
-        " and (EventPkgSeatsAvailable gt 0 or EventPkgNumOnWaitl gt 0)";
-      return EVENTS_URL + "?sap-client=500&$top=5000&$select=ModuleID&$filter=" + encodeURIComponent(filter);
-    });
-    return Promise.all(urls.map(window.__tssregShared.fetchJson)).then((results) => {
-      const matched = new Set();
-      results.forEach((data) => {
-        ((data && data.value) || []).forEach((r) => matched.add(r.ModuleID));
-      });
-      return matched;
-    });
+        " and (EventPkgSeatsAvailable gt 0 or EventPkgNumOnWaitl gt 0)"
+    );
   }
 
   window.__tssregShared.registerModuleFilter({

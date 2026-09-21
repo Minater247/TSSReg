@@ -1,8 +1,13 @@
 (() => {
   const MODULE_PATH_MARKER = "YUCSD_CON_MODULE?";
-  const MODULE_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_MODULE";
-  const FULL_IDS_TOP = 5000;
+  const SERVICE_ROOT =
+    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/";
+  const MODULE_URL = SERVICE_ROOT + "YUCSD_CON_MODULE";
+  const CLIENT = "sap-client=500";
+  const ROW_LIMIT = 5000;
+  const ID_CHUNK_SIZE = 40;
+  const OVERVIEW_ROUTE = /^#YStudent-Overview(?:[?&]|$)/;
+  const SCHEDULE_ROUTE = /^#YSchedule-view(?:[?&]|$)/;
   const tickCallbacks = [];
   const uiCallbacks = [];
   const moduleFilters = [];
@@ -47,6 +52,62 @@
     return fetch(url, { headers: { Accept: "application/json" } }).then((r) => (r.ok ? r.json() : null));
   }
 
+  function serviceUrl(path) {
+    return SERVICE_ROOT + path;
+  }
+
+  function odataLiteral(value) {
+    return "'" + String(value).replace(/'/g, "''") + "'";
+  }
+
+  function moduleRows(entity, ids, select, filterFor) {
+    if (!ids.length) return Promise.resolve([]);
+    const urls = chunk(ids, ID_CHUNK_SIZE).map((part) => {
+      const idClause = part.map((id) => "ModuleID eq '" + id + "'").join(" or ");
+      return (
+        serviceUrl(entity) +
+        "?" + CLIENT +
+        "&$top=" + ROW_LIMIT +
+        "&$select=" + select +
+        "&$filter=" + encodeURIComponent(filterFor(idClause))
+      );
+    });
+    return Promise.all(urls.map(fetchJson)).then((results) => {
+      const rows = [];
+      results.forEach((data) => ((data && data.value) || []).forEach((row) => rows.push(row)));
+      return rows;
+    });
+  }
+
+  function moduleIdSet(entity, ids, filterFor) {
+    return moduleRows(entity, ids, "ModuleID", filterFor).then((rows) => {
+      const matched = new Set();
+      rows.forEach((row) => matched.add(row.ModuleID));
+      return matched;
+    });
+  }
+
+  function isOverviewRoute() {
+    return OVERVIEW_ROUTE.test(location.hash || "");
+  }
+
+  function cardElement(card) {
+    return document.querySelector('[id*="--' + card + 'Original"]');
+  }
+
+  function navigate(link) {
+    if (!link || !link.url) return;
+    if (link.url.charAt(0) === "#") {
+      location.hash = link.url;
+      return;
+    }
+    if (link.newWindow) {
+      window.open(link.url, "_blank", "noopener");
+      return;
+    }
+    location.href = link.url;
+  }
+
   function extractModuleQuery(requestBody) {
     const idx = requestBody.indexOf(MODULE_PATH_MARKER);
     if (idx === -1) return null;
@@ -67,7 +128,7 @@
 
   function buildFullQueryUrl(query) {
     const params = new URLSearchParams(query);
-    params.set("$top", String(FULL_IDS_TOP));
+    params.set("$top", String(ROW_LIMIT));
     params.delete("$skip");
     return MODULE_URL + "?" + params.toString();
   }
@@ -258,7 +319,7 @@
 
   function check() {
     uiCallbacks.forEach((fn) => fn());
-    if (!/^#YSchedule-view(?:[?&]|$)/.test(location.hash || "")) return;
+    if (!SCHEDULE_ROUTE.test(location.hash || "")) return;
     const bar = filterBarElement();
     if (!bar) return;
     tickCallbacks.forEach((fn) => fn(bar));
@@ -280,7 +341,7 @@
   }
 
   function syncDashboardObserver() {
-    if (/^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "")) {
+    if (isOverviewRoute()) {
       if (dashboardObserver) return;
       dashboardObserver = new MutationObserver(onDashboardMutated);
       dashboardObserver.observe(document.body, { childList: true, subtree: true });
@@ -294,14 +355,23 @@
   }
 
   window.__tssregShared = {
-    filterBarElement,
     onScheduleTick,
     onUiUpdated,
     registerModuleFilter,
     setOverviewPrimary,
     overviewPrimaryLinks,
+    isOverviewRoute,
+    cardElement,
+    navigate,
     chunk,
     fetchJson,
+    serviceUrl,
+    odataLiteral,
+    moduleRows,
+    moduleIdSet,
+    CLIENT,
+    ROW_LIMIT,
+    ID_CHUNK_SIZE,
   };
 
   patchNetwork();

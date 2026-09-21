@@ -1,4 +1,5 @@
 (() => {
+  const shared = window.__tssregShared;
   const IDENTITY_CARD = "card08";
   const BAND_ID = "tssreg-top-band";
   const GRID_ID = "tssreg-quicklinks";
@@ -8,22 +9,6 @@
   sap.ui.require(["sap/m/VBox", "sap/m/Image", "sap/m/Text"], (VBox, Image, Text) => {
     modules = { VBox, Image, Text };
   });
-
-  function isOverviewRoute() {
-    return /^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "");
-  }
-
-  function navigate(link) {
-    if (link.url.charAt(0) === "#") {
-      location.hash = link.url;
-      return;
-    }
-    if (link.newWindow) {
-      window.open(link.url, "_blank", "noopener");
-      return;
-    }
-    location.href = link.url;
-  }
 
   function tile(link) {
     const box = new modules.VBox({
@@ -35,11 +20,11 @@
       ],
     });
     box.addStyleClass("tssreg-tile");
-    box.attachBrowserEvent("click", () => navigate(link));
+    box.attachBrowserEvent("click", () => shared.navigate(link));
     box.attachBrowserEvent("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      navigate(link);
+      shared.navigate(link);
     });
     box.addEventDelegate({
       onAfterRendering: () => {
@@ -78,19 +63,19 @@
   }
 
   function apply() {
-    if (!isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute() || !modules) return;
     if (document.getElementById(GRID_ID)) return;
 
     const inner = document.querySelector(".sapUshellEasyScanLayoutInner");
     const cardWrapper = inner && inner.querySelector('[id$="--' + IDENTITY_CARD + '"]');
     if (!inner || !cardWrapper) return;
 
-    const links = window.__tssregShared.overviewPrimaryLinks();
+    const links = shared.overviewPrimaryLinks();
     if (!links) return;
 
     const grid = sap.ui.getCore().byId(GRID_ID) || buildGrid(links);
     grid.placeAt(mountBand(inner, cardWrapper));
   }
 
-  window.__tssregShared.onUiUpdated(apply);
+  shared.onUiUpdated(apply);
 })();

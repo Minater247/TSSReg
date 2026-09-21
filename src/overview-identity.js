@@ -1,4 +1,5 @@
 (() => {
+  const shared = window.__tssregShared;
   const CARD = "card08";
   const COURSES_CARD = "card05";
   const ELEMENT_ID = "tssreg-course-count";
@@ -13,16 +14,8 @@
     modules = { QuickViewGroupElement };
   });
 
-  function isOverviewRoute() {
-    return /^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "");
-  }
-
-  function cardElement(card) {
-    return document.querySelector('[id*="--' + card + 'Original"]');
-  }
-
   function courseCount() {
-    const cardEl = cardElement(COURSES_CARD);
+    const cardEl = shared.cardElement(COURSES_CARD);
     const listEl = cardEl && cardEl.querySelector(".sapMList");
     const list = listEl && sap.ui.getCore().byId(listEl.id);
     if (!list) return 0;
@@ -61,9 +54,9 @@
   }
 
   function apply() {
-    if (!isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute() || !modules) return;
 
-    const cardEl = cardElement(CARD);
+    const cardEl = shared.cardElement(CARD);
     if (cardEl) calmNavContainer(cardEl);
     const quickViewEl = cardEl && cardEl.querySelector('[id$="quickViewCard"]');
     const quickView = quickViewEl && sap.ui.getCore().byId(quickViewEl.id);
@@ -95,5 +88,5 @@
     );
   }
 
-  window.__tssregShared.onUiUpdated(apply);
+  shared.onUiUpdated(apply);
 })();

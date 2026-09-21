@@ -1,9 +1,7 @@
 (() => {
-  const ROOT = "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/";
-  const CLIENT = "sap-client=500";
-  const ID_CHUNK_SIZE = 40;
+  const shared = window.__tssregShared;
+  const { chunk, serviceUrl, odataLiteral: literal, CLIENT, ROW_LIMIT, ID_CHUNK_SIZE } = shared;
   const RESULT_LIMIT = 200;
-  const ROW_LIMIT = 5000;
   const TIME_MIN = 360;
   const TIME_MAX = 1320;
   const UNITS_MIN = 0;
@@ -17,18 +15,8 @@
   const valueHelpCache = {};
   const instructorCache = {};
 
-  function literal(value) {
-    return "'" + String(value).replace(/'/g, "''") + "'";
-  }
-
-  function chunk(list, size) {
-    const out = [];
-    for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
-    return out;
-  }
-
   function getRows(path) {
-    return fetch(ROOT + path, { headers: { Accept: "application/json" } })
+    return fetch(serviceUrl(path), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) throw new Error(String(response.status));
         return response.json();
@@ -132,7 +120,7 @@
     if (creditRangeCache[cacheKey]) return creditRangeCache[cacheKey];
     const path =
       "YUCSD_I_MINMAXUNITS(Peryr=" + literal(year) + ",Perid=" + literal(term) + ")?" + CLIENT;
-    creditRangeCache[cacheKey] = fetch(ROOT + path, { headers: { Accept: "application/json" } })
+    creditRangeCache[cacheKey] = fetch(serviceUrl(path), { headers: { Accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         const min = Number(data && data.minCredits);
@@ -219,6 +207,22 @@
     return (left === undefined ? 9 : left) - (right === undefined ? 9 : right);
   }
 
+  function stripPad(value) {
+    return String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
+  }
+
+  function scheduleKey(year, term, moduleId, sectionId) {
+    return [stripPad(year), stripPad(term), stripPad(moduleId), stripPad(sectionId)].join("|");
+  }
+
+  function schedScope(year, term) {
+    return "AcYear eq " + literal(year) + " and Acsess eq " + literal(term);
+  }
+
+  function eventScope(year, term) {
+    return "AcYear eq " + literal(year) + " and AcPeriod eq " + literal(term);
+  }
+
   function meetingsByModule(rows) {
     const out = {};
     rows.forEach((row) => {
@@ -226,7 +230,7 @@
       const startMin = toMinutes(row.BeginTime);
       const endMin = toMinutes(row.EndTime);
       if (!day || startMin == null || endMin == null || endMin <= startMin) return;
-      const key = row.ModuleID + "|" + row.SectionId;
+      const key = scheduleKey(row.AcYear, row.Acsess, row.ModuleID, row.SectionId);
       const list = out[key] || (out[key] = []);
       const duplicate = list.some((entry) => entry.day === day && entry.startMin === startMin && entry.endMin === endMin);
       if (!duplicate) list.push({ day, startMin, endMin });
@@ -243,7 +247,7 @@
     return out;
   }
 
-  function buildSections(ids, schedule, events, buildings) {
+  function buildSections(ids, schedule, events, buildings, year, term) {
     const meetings = meetingsByModule(schedule);
     const building = buildingsByModule(buildings);
     const out = {};
@@ -274,7 +278,7 @@
             methodCode: row.TeachingMethod || "",
             instructor: row.InstructorName || "",
             location: roomFrom(row.Sched) || building[id] || "",
-            meetings: meetings[id + "|" + row.EventObjid] || [],
+            meetings: meetings[scheduleKey(year, term, id, row.EventObjid)] || [],
           });
         });
       order.forEach((packageId) => packages[packageId].components.sort(byType));
@@ -287,21 +291,35 @@
     return "(" + ids.map((id) => "ModuleID eq " + literal(id)).join(" or ") + ")";
   }
 
-  function fetchEntity(entity, ids) {
+  function fetchEntity(entity, ids, scope) {
     return Promise.all(
       chunk(ids, ID_CHUNK_SIZE).map((part) =>
-        getRows(entity + "?" + CLIENT + "&$top=" + ROW_LIMIT + "&$filter=" + encodeURIComponent(idClause(part)))
+        getRows(
+          entity +
+            "?" +
+            CLIENT +
+            "&$top=" +
+            ROW_LIMIT +
+            "&$filter=" +
+            encodeURIComponent(scope ? idClause(part) + " and " + scope : idClause(part))
+        )
       )
     ).then((results) => [].concat.apply([], results));
   }
 
-  function fetchSections(ids) {
+  function loadMeetings(ids, year, term) {
+    const wanted = ids.map(stripPad).filter(Boolean);
+    if (!wanted.length) return Promise.resolve({});
+    return fetchEntity("YUCSD_CON_MODULE_SCHED", wanted, schedScope(year, term)).then(meetingsByModule);
+  }
+
+  function fetchSections(ids, year, term) {
     if (!ids.length) return Promise.resolve({});
     return Promise.all([
-      fetchEntity("YUCSD_CON_MODULE_SCHED", ids),
-      fetchEntity("YUCSD_CON_EVENTS", ids),
-      fetchEntity("YUCSD_CON_MODULE_BLDG", ids),
-    ]).then(([schedule, events, buildings]) => buildSections(ids, schedule, events, buildings));
+      fetchEntity("YUCSD_CON_MODULE_SCHED", ids, schedScope(year, term)),
+      fetchEntity("YUCSD_CON_EVENTS", ids, eventScope(year, term)),
+      fetchEntity("YUCSD_CON_MODULE_BLDG", ids, sessionScope(year, term)),
+    ]).then(([schedule, events, buildings]) => buildSections(ids, schedule, events, buildings, year, term));
   }
 
   function packageDays(pkg) {
@@ -372,18 +390,15 @@
     TIME_MAX,
     UNITS_MIN,
     UNITS_MAX,
-    DAY_ORDER,
-    normalizeCode,
-    normalizeSectionId,
     loadTerms,
     loadValueHelps,
     loadInstructors,
     loadCreditRange,
+    loadMeetings,
+    scheduleKey,
+    plainId: stripPad,
     search,
-    searchPath,
     fetchSections,
-    buildSections,
-    packageDays,
     match,
     conflicts,
     toSection,

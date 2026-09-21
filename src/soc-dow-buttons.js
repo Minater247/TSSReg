@@ -8,9 +8,6 @@
     ["6", "Saturday", "Sa"],
     ["7", "Sunday", "Su"],
   ];
-  const SCHED_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_MODULE_SCHED";
-  const ID_CHUNK_SIZE = 40;
 
   let selectedDays = new Set();
 
@@ -76,21 +73,13 @@
   }
 
   function matchingModuleIds(year, term, ids) {
-    if (!ids.length) return Promise.resolve(new Set());
     const dayClause = [...selectedDays].map((d) => "DoW eq '" + d + "'").join(" or ");
-    const urls = window.__tssregShared.chunk(ids, ID_CHUNK_SIZE).map((idChunk) => {
-      const idClause = idChunk.map((id) => "ModuleID eq '" + id + "'").join(" or ");
-      const filter =
-        "AcYear eq '" + year + "' and Acsess eq '" + term + "' and (" + idClause + ") and (" + dayClause + ")";
-      return SCHED_URL + "?sap-client=500&$top=5000&$select=ModuleID&$filter=" + encodeURIComponent(filter);
-    });
-    return Promise.all(urls.map(window.__tssregShared.fetchJson)).then((results) => {
-      const matched = new Set();
-      results.forEach((data) => {
-        ((data && data.value) || []).forEach((r) => matched.add(r.ModuleID));
-      });
-      return matched;
-    });
+    return window.__tssregShared.moduleIdSet(
+      "YUCSD_CON_MODULE_SCHED",
+      ids,
+      (idClause) =>
+        "AcYear eq '" + year + "' and Acsess eq '" + term + "' and (" + idClause + ") and (" + dayClause + ")"
+    );
   }
 
   window.__tssregShared.registerModuleFilter({

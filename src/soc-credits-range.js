@@ -1,6 +1,5 @@
 (() => {
-  const MINMAXUNITS_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_I_MINMAXUNITS";
+  const MINMAXUNITS_URL = window.__tssregShared.serviceUrl("YUCSD_I_MINMAXUNITS");
   const STEP = 1;
 
   let current = null;

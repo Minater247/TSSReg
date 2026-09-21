@@ -1,9 +1,5 @@
 (() => {
   const ROOT_ID = "tssreg-courses-finder";
-  const PAGE_SELECTOR = '[id$="--mymodulesPage"]';
-  const LIST_SUFFIX = /--mymodList$/;
-  const SOC_ROUTE = "#YSchedule-view";
-  const DAY_NAMES = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const DAY_PILLS = [
     ["MO", "M", "Monday"],
     ["TU", "Tu", "Tuesday"],
@@ -31,6 +27,8 @@
   ];
 
   const catalog = window.__tssregShared.catalog;
+  const coursesPage = window.__tssregShared.coursesPage;
+  const { isCoursesRoute, pageControl, listControl, meridiemLabel } = coursesPage;
   const plans = window.__tssregShared.plans;
   const schedule = window.__tssregShared.schedule;
 
@@ -117,68 +115,6 @@
       apply();
     }
   );
-
-  function isCoursesRoute() {
-    const hash = location.hash || "";
-    return /\/MyModules$/.test(hash) && hash.indexOf("/Detail/") === -1;
-  }
-
-  function pageControl() {
-    const el = document.querySelector(PAGE_SELECTOR);
-    const page = el ? sap.ui.getCore().byId(el.id) : null;
-    return page && page.getContent ? page : null;
-  }
-
-  function listControl(page) {
-    return page.getContent().filter((control) => LIST_SUFFIX.test(control.getId()))[0] || null;
-  }
-
-  function odataLiteral(value) {
-    return "'" + String(value).replace(/'/g, "''") + "'";
-  }
-
-  function courseRoute(moduleId) {
-    if (!state.year || !state.term) return SOC_ROUTE;
-    return (
-      SOC_ROUTE +
-      "&/YUCSD_CON_MODULE(AcademicYear=" +
-      odataLiteral(state.year) +
-      ",AcademicPeriod=" +
-      odataLiteral(state.term) +
-      ",ModuleID=" +
-      odataLiteral(moduleId) +
-      ")?layout=TwoColumnsMidExpanded"
-    );
-  }
-
-  function clockLabel(minutes) {
-    const hours = Math.floor(minutes / 60);
-    return (hours % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0") + (hours >= 12 ? " PM" : " AM");
-  }
-
-  function meetingLabel(component) {
-    const groups = {};
-    const order = [];
-    component.meetings.forEach((meeting) => {
-      const key = meeting.startMin + "-" + meeting.endMin;
-      if (!groups[key]) {
-        groups[key] = { startMin: meeting.startMin, endMin: meeting.endMin, days: [] };
-        order.push(key);
-      }
-      groups[key].days.push(meeting.day);
-    });
-    if (!order.length) return "TBA";
-    return order
-      .map((key) => groups[key])
-      .sort((a, b) => a.startMin - b.startMin)
-      .map((group) => {
-        const days = catalog.DAY_ORDER.filter((day) => group.days.indexOf(day) !== -1)
-          .map((day) => DAY_NAMES[day])
-          .join("/");
-        return days + " " + clockLabel(group.startMin) + " – " + clockLabel(group.endMin);
-      })
-      .join("\n");
-  }
 
   function text(value, styleClass) {
     const control = new modules.Text({ text: value, wrapping: true });
@@ -288,7 +224,7 @@
     if (!missing.length) return;
     missing.forEach((id) => (fetching[id] = true));
     catalog
-      .fetchSections(missing)
+      .fetchSections(missing, state.year, state.term)
       .then((byModule) => {
         missing.forEach((id) => (sectionsByModule[id] = byModule[id] || []));
       })
@@ -371,7 +307,7 @@
             cells: [
               text(component.abbr || component.sectionId),
               text(component.type || "—"),
-              text(meetingLabel(component)),
+              text(coursesPage.meetingLabel(component.meetings) || "TBA"),
               text(component.location || "—"),
               text(component.instructor || "—"),
             ],
@@ -395,7 +331,7 @@
       });
     }
     return new modules.ObjectStatus({
-      text: "Full" + (!isNaN(waiting) && waiting > 0 ? " · " + waiting + " waiting" : ""),
+      text: "Full" + (!isNaN(waiting) && waiting > 0 ? " | " + waiting + " waiting" : ""),
       state: !isNaN(waiting) && waiting > 0 ? "Warning" : "Error",
     });
   }
@@ -445,7 +381,7 @@
         text: "Enroll",
         tooltip: "Open this course in the Schedule of Classes to enroll.",
         press: () => {
-          location.hash = courseRoute(pkg.moduleId);
+          location.hash = coursesPage.courseRoute(state.year, state.term, pkg.moduleId);
         },
       })
     );
@@ -475,7 +411,7 @@
   }
 
   function courseHeader(course) {
-    const meta = [course.credits ? course.credits + " units" : "", course.department].filter(Boolean).join(" · ");
+    const meta = [course.credits ? course.credits + " units" : "", course.department].filter(Boolean).join(" | ");
     const row = new modules.HBox({ renderType: "Bare", alignItems: "Baseline", wrap: "Wrap" });
     row.addStyleClass("tssreg-find-course-head");
     row.addItem(text(course.code, "tssreg-find-course-code"));
@@ -748,7 +684,7 @@
         state.f.timeMin = range[0];
         state.f.timeMax = range[1];
       },
-      format: () => clockLabel(state.f.timeMin) + " \u2013 " + clockLabel(state.f.timeMax),
+      format: () => meridiemLabel(state.f.timeMin) + " \u2013 " + meridiemLabel(state.f.timeMax),
     });
 
     return [
@@ -870,11 +806,6 @@
     return ui.panel;
   }
 
-  function mountAfterList(page, list, control) {
-    const target = page.indexOfContent(list) + 1;
-    if (page.indexOfContent(control) !== target) page.insertContent(control, target);
-  }
-
   function teardown() {
     const existing = sap.ui.getCore().byId(ROOT_ID);
     if (existing) existing.destroy();
@@ -894,7 +825,7 @@
       if (root) root.destroy();
       root = buildRoot();
     }
-    mountAfterList(page, list, root);
+    coursesPage.mountAfterList(page, list, root);
   }
 
   window.__tssregShared.onUiUpdated(apply);

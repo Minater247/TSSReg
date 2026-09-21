@@ -1,10 +1,6 @@
 (() => {
-  const MODULE_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_MODULE";
-  const SCHED_URL =
-    "/sap/opu/odata4/sap/yucsd_con_module_sb/srvd/sap/yucsd_con_module_servicedef/0001/YUCSD_CON_MODULE_SCHED";
+  const MODULE_URL = window.__tssregShared.serviceUrl("YUCSD_CON_MODULE");
   const MYMODULES_URL = "/sap/opu/odata/ITUS/PR_MY_MODULES_V2_SRV/ModuleHeaderSet";
-  const ID_CHUNK_SIZE = 40;
 
   let hideConflicts = false;
 
@@ -58,17 +54,12 @@
   }
 
   function fetchSchedRows(year, term, ids) {
-    if (!ids.length) return Promise.resolve([]);
-    const urls = window.__tssregShared.chunk(ids, ID_CHUNK_SIZE).map((idChunk) => {
-      const idClause = idChunk.map((id) => "ModuleID eq '" + id + "'").join(" or ");
-      const filter = "AcYear eq '" + year + "' and Acsess eq '" + term + "' and (" + idClause + ")";
-      return SCHED_URL + "?sap-client=500&$top=5000&$select=ModuleID,DoW,BeginTime,EndTime&$filter=" + encodeURIComponent(filter);
-    });
-    return Promise.all(urls.map(window.__tssregShared.fetchJson)).then((results) => {
-      const rows = [];
-      results.forEach((data) => ((data && data.value) || []).forEach((r) => rows.push(r)));
-      return rows;
-    });
+    return window.__tssregShared.moduleRows(
+      "YUCSD_CON_MODULE_SCHED",
+      ids,
+      "ModuleID,DoW,BeginTime,EndTime",
+      (idClause) => "AcYear eq '" + year + "' and Acsess eq '" + term + "' and (" + idClause + ")"
+    );
   }
 
   function fetchCommittedIds(year, term) {

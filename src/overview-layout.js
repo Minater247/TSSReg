@@ -1,4 +1,5 @@
 (() => {
+  const shared = window.__tssregShared;
   const LINK_CARDS = ["card01", "card02", "card03"];
   const MODEL_NAME = "tssreg";
   const BAND_ID = "tssreg-more-band";
@@ -97,16 +98,8 @@
     }
   );
 
-  function isOverviewRoute() {
-    return /^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "");
-  }
-
-  function cardElement(card) {
-    return document.querySelector('[id*="--' + card + 'Original"]');
-  }
-
   function listControl(card) {
-    const cardEl = cardElement(card);
+    const cardEl = shared.cardElement(card);
     const listEl = cardEl && cardEl.querySelector(".sapMList");
     return listEl ? sap.ui.getCore().byId(listEl.id) : null;
   }
@@ -152,7 +145,7 @@
     if (primary.length !== PRIMARY.length) return false;
 
     cache = { links, byText };
-    window.__tssregShared.setOverviewPrimary(primary);
+    shared.setOverviewPrimary(primary);
     return true;
   }
 
@@ -188,19 +181,6 @@
     return groups.sort((a, b) => b.items.length - a.items.length);
   }
 
-  function navigate(link) {
-    if (!link || !link.url) return;
-    if (link.url.charAt(0) === "#") {
-      location.hash = link.url;
-      return;
-    }
-    if (link.newWindow) {
-      window.open(link.url, "_blank", "noopener");
-      return;
-    }
-    location.href = link.url;
-  }
-
   function linkTemplate() {
     return new modules.StandardListItem({
       title: "{" + MODEL_NAME + ">text}",
@@ -209,7 +189,7 @@
       type: "Navigation",
       press: (event) => {
         const context = event.getSource().getBindingContext(MODEL_NAME);
-        navigate(context && context.getObject());
+        shared.navigate(context && context.getObject());
       },
     });
   }
@@ -221,7 +201,7 @@
   }
 
   function applyCardTitle(card, title) {
-    const cardEl = cardElement(card);
+    const cardEl = shared.cardElement(card);
     const titleEl = cardEl && cardEl.querySelector('[id$="ovpHeaderTitle"]');
     const control = titleEl && sap.ui.getCore().byId(titleEl.id);
     if (control && control.getText && control.getText() !== title) control.setText(title);
@@ -295,7 +275,7 @@
   }
 
   function apply() {
-    if (!isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute() || !modules) return;
     disableDragAndDrop();
     if (!harvest()) return;
     SECONDARY.forEach(applySecondary);
@@ -303,5 +283,5 @@
     if (inner) applyMore(inner);
   }
 
-  window.__tssregShared.onUiUpdated(apply);
+  shared.onUiUpdated(apply);
 })();

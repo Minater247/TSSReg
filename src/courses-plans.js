@@ -185,7 +185,6 @@
     rename,
     remove,
     hasSection,
-    addSection,
     removeSection,
     toggleSection,
     defaultName,

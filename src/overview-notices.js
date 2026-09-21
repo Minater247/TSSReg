@@ -1,4 +1,5 @@
 (() => {
+  const shared = window.__tssregShared;
   const BAND_ID = "tssreg-notice-band";
   const LIST_ID = "tssreg-notices";
   const COURSES_CARD = "card05";
@@ -17,10 +18,6 @@
   sap.ui.require(["sap/m/VBox", "sap/m/HBox", "sap/m/Text", "sap/m/Link", "sap/ui/core/HTML"], (VBox, HBox, Text, Link, HTML) => {
     modules = { VBox, HBox, Text, Link, HTML };
   });
-
-  function isOverviewRoute() {
-    return /^#YStudent-Overview(?:[?&]|$)/.test(location.hash || "");
-  }
 
   function ensureData() {
     if (fetchStarted) return;
@@ -303,7 +300,7 @@
   }
 
   function apply() {
-    if (!isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute() || !modules) return;
     ensureData();
     if (!data) return;
 
@@ -330,5 +327,5 @@
     list.placeAt(mountBand(inner));
   }
 
-  window.__tssregShared.onUiUpdated(apply);
+  shared.onUiUpdated(apply);
 })();
