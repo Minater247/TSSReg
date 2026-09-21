@@ -3,23 +3,42 @@
   "name": "TSSReg",
   "version": "0.1.0",
   "description": "Fixes UCSD Triton Student System quirks.",
-  "permissions": ["declarativeNetRequest"],
-  "host_permissions": ["https://tss.ucsd.edu/*"],
+  "permissions": [
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://tss.ucsd.edu/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://tss.ucsd.edu/*"],
-      "js": ["timezone-fix.js"],
+      "matches": [
+        "https://tss.ucsd.edu/*"
+      ],
+      "js": [
+        "timezone-fix.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start"
     },
     {
-      "matches": ["https://tss.ucsd.edu/fiori*"],
-      "css": ["soc-filters.css", "overview.css", "shell.css"],
-      "js": ["soc-search-normalize.js"],
+      "matches": [
+        "https://tss.ucsd.edu/fiori*"
+      ],
+      "css": [
+        "soc-filters.css",
+        "overview.css",
+        "shell.css",
+        "courses.css"
+      ],
+      "js": [
+        "soc-search-normalize.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://tss.ucsd.edu/fiori*"],
+      "matches": [
+        "https://tss.ucsd.edu/fiori*"
+      ],
       "js": [
         "soc-shared.js",
         "soc-filters.js",
@@ -32,7 +51,8 @@
         "overview-notices.js",
         "overview-calendar.js",
         "overview-identity.js",
-        "overview-quicklinks.js"
+        "overview-quicklinks.js",
+        "courses-calendar.js"
       ],
       "world": "MAIN",
       "run_at": "document_idle"

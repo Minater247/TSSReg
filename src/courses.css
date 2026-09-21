@@ -1,0 +1,246 @@
+.sapMFlexBox.tssreg-cal {
+  --tssreg-border: #e5e5e5;
+  --tssreg-line: #f0f0f0;
+  --tssreg-bg: #ffffff;
+  --tssreg-text: #131e29;
+  --tssreg-muted: #556b82;
+  --tssreg-hour-px: 60px;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 18px;
+  color: var(--tssreg-text);
+}
+
+.tssreg-cal .tssreg-cal-legend {
+  gap: 16px;
+  padding: 4px 4px 10px;
+}
+
+.tssreg-cal .tssreg-cal-legend-item {
+  gap: 6px;
+}
+
+.tssreg-cal .tssreg-cal-legend-text.sapMText {
+  font-size: 0.8125rem !important;
+  color: var(--tssreg-muted) !important;
+}
+
+.tssreg-cal .tssreg-cal-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.tssreg-cal .tssreg-cal-swatch-conflict {
+  background-color: var(--tssreg-bg);
+  border: 2px solid #bb0000;
+}
+
+.tssreg-cal .tssreg-cal-body {
+  align-items: flex-start;
+  border-top: 1px solid var(--tssreg-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  background-color: var(--tssreg-bg);
+}
+
+.tssreg-cal .tssreg-cal-timeaxis {
+  flex: 0 0 62px;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: var(--tssreg-bg);
+}
+
+.tssreg-cal .tssreg-cal-timeaxis-label.sapMText {
+  position: absolute;
+  right: 8px;
+  display: block;
+  font-size: 0.6875rem !important;
+  line-height: 1 !important;
+  color: var(--tssreg-muted) !important;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.tssreg-cal .tssreg-cal-days {
+  flex: 1 1 auto;
+  min-width: 620px;
+  align-items: stretch;
+}
+
+.tssreg-cal .tssreg-cal-day {
+  flex: 1 1 0;
+  min-width: 0;
+  border-left: 1px solid var(--tssreg-border);
+}
+
+.tssreg-cal .tssreg-cal-day-header.sapMText {
+  display: block;
+  font-weight: 600;
+  font-size: 0.75rem !important;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--tssreg-border);
+  position: sticky;
+  top: 0;
+  background-color: var(--tssreg-bg);
+  z-index: 2;
+}
+
+.tssreg-cal .tssreg-cal-day-track {
+  position: relative;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--tssreg-line) 0,
+    var(--tssreg-line) 1px,
+    transparent 1px,
+    transparent var(--tssreg-hour-px)
+  );
+}
+
+.tssreg-cal .tssreg-cal-block {
+  position: absolute;
+  border-radius: 3px;
+  overflow: hidden;
+  padding: 2px 4px 6px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.tssreg-cal .tssreg-cal-block:focus-visible {
+  outline: 2px solid var(--tssreg-accent, #0a6ed1);
+  outline-offset: 1px;
+}
+
+.tssreg-cal .tssreg-cal-block-toprow {
+  gap: 4px;
+}
+
+.tssreg-cal .tssreg-cal-block-time.sapMText,
+.tssreg-cal .tssreg-cal-block-status.sapMText {
+  display: block;
+  font-size: 0.5625rem !important;
+  line-height: 11px !important;
+  color: inherit !important;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.tssreg-cal .tssreg-cal-block-status.sapMText {
+  font-weight: 600;
+}
+
+.tssreg-cal .tssreg-cal-block-title.sapMText {
+  display: block;
+  font-weight: 600;
+  font-size: 0.75rem !important;
+  line-height: 14px !important;
+  margin: 4px 0;
+  color: inherit !important;
+}
+
+.tssreg-cal .tssreg-cal-block-sub.sapMText,
+.tssreg-cal .tssreg-cal-block-instructor.sapMText {
+  display: block;
+  font-size: 0.625rem !important;
+  line-height: 12px !important;
+  color: inherit !important;
+}
+
+.tssreg-cal .tssreg-cal-block-instructor.sapMText {
+  opacity: 0.85;
+}
+
+.tssreg-cal .tssreg-cal-status-enrolled {
+  background-color: #40798e;
+  color: #ffffff;
+  border: 1px solid #2c5867;
+}
+
+.tssreg-cal .tssreg-cal-status-waitlisted {
+  background-color: #ccffff;
+  color: #000000;
+  border: 1px solid #7fcccc;
+}
+
+.tssreg-cal .tssreg-cal-status-other {
+  background-color: #eeeeee;
+  color: #333333;
+  border: 1px solid #cccccc;
+}
+
+.tssreg-cal .tssreg-cal-block.tssreg-cal-conflict {
+  border: 2px solid #bb0000;
+}
+
+.tssreg-native-list-hidden > [id$="-listUl"],
+.tssreg-native-list-hidden > [id$="-before"],
+.tssreg-native-list-hidden > [id$="-after"],
+.tssreg-native-list-hidden > [id$="-nodata"] {
+  display: none !important;
+}
+
+.sapMFlexBox.tssreg-cal-loading {
+  padding: 24px 4px;
+  gap: 8px;
+}
+
+.tssreg-cal-loading .tssreg-cal-loading-text.sapMText {
+  display: block;
+  font-size: 0.875rem !important;
+}
+
+.tssreg-cal-loading .sapMPI,
+.tssreg-cal-loading .sapMPIBar {
+  height: 6px !important;
+  min-height: 6px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.tssreg-cal-loading .sapMPI {
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sapMPopover.tssreg-detail-popover .sapMPopoverCont {
+  padding: 12px 16px;
+}
+
+.tssreg-detail-popover .tssreg-detail {
+  padding: 0;
+}
+
+.tssreg-detail-popover .tssreg-detail-row {
+  padding: 5px 0;
+}
+
+.tssreg-detail-popover .tssreg-detail-label.sapMLabel {
+  font-size: 0.6875rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tssreg-muted, #556b82) !important;
+  line-height: 1.4 !important;
+}
+
+.tssreg-detail-popover .tssreg-detail-value.sapMText {
+  display: block;
+  font-size: 0.875rem !important;
+}
+
+.tssreg-detail-popover .tssreg-detail-value-link {
+  gap: 8px;
+  width: 100%;
+}
+
+.tssreg-detail-popover .tssreg-detail-value-link .sapMBtn {
+  flex: 0 0 auto;
+}
+
+.tssreg-detail-popover .tssreg-detail-divider {
+  border-top: 1px solid var(--tssreg-border, #e5e5e5);
+  margin: 8px 0;
+}
