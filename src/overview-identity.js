@@ -7,6 +7,7 @@
   const MY_COURSES = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/MyModules";
 
   let modules = null;
+  const calmedNavs = new WeakSet();
 
   sap.ui.require(["sap/m/QuickViewGroupElement"], (QuickViewGroupElement) => {
     modules = { QuickViewGroupElement };
@@ -48,10 +49,22 @@
     page.setDescription(ID_PREFIX + description);
   }
 
+  function calmNavContainer(cardEl) {
+    const navEl = cardEl.querySelector(".sapMNav");
+    const nav = navEl && sap.ui.getCore().byId(navEl.id);
+    if (!nav || !nav.getAutoFocus) return;
+    if (nav.getAutoFocus()) nav.setProperty("autoFocus", false, true);
+    if (calmedNavs.has(nav)) return;
+    calmedNavs.add(nav);
+    const active = document.activeElement;
+    if (active && navEl.contains(active)) active.blur();
+  }
+
   function apply() {
     if (!isOverviewRoute() || !modules) return;
 
     const cardEl = cardElement(CARD);
+    if (cardEl) calmNavContainer(cardEl);
     const quickViewEl = cardEl && cardEl.querySelector('[id$="quickViewCard"]');
     const quickView = quickViewEl && sap.ui.getCore().byId(quickViewEl.id);
     const page = quickView && quickView.getPages()[0];

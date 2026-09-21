@@ -29,6 +29,7 @@
         "soc-timeofday.js",
         "soc-conflict.js",
         "overview-layout.js",
+        "overview-notices.js",
         "overview-calendar.js",
         "overview-identity.js",
         "overview-quicklinks.js"
