@@ -390,12 +390,10 @@
     content.push(detailRow("Instructor", component.instructor));
     if (section.components.length > 1) {
       const types = section.components.map((entry) => entry.type).filter(Boolean).join(", ");
-      content.push(
-        detailRow("Package", section.components.length + " components" + (types ? " (" + types + ")" : ""))
-      );
+      content.push(detailRow("Includes", types || section.components.length + " meetings"));
     }
     content.push(detailRow("Credits", section.credits));
-    content.push(detailRow("Status", "Planned \u2014 not enrolled"));
+    content.push(detailRow("Status", "Planned"));
     return detailBox(content);
   }
 
@@ -444,19 +442,19 @@
         new modules.Button({
           text: "Enroll",
           type: "Emphasized",
-          tooltip: "Open this course in the Schedule of Classes to enroll.",
+          tooltip: "Open this course in the Schedule of Classes",
           press: () => {
             closePopover();
             location.hash = coursesPage.courseRoute(section.year, section.term, section.moduleId);
           },
         }),
         new modules.Button({
-          text: "Remove",
+          text: "Unplan",
           type: "Reject",
           tooltip:
             section.components.length > 1
-              ? "Removes the whole package" + (types ? " (" + types + ")" : "") + ", not just this meeting."
-              : "Remove this course from the schedule.",
+              ? "Unplans the whole class" + (types ? " (" + types + ")" : "")
+              : "Unplans this class",
           press: () => {
             closePopover();
             plans.removeSection(section.moduleId, section.pkgId);
@@ -474,11 +472,11 @@
     };
     const content = [
       new modules.ToolbarSpacer(),
-      new modules.Button({ text: "View in TSS", tooltip: "Open this course on the TSS detail page.", press: go }),
+      new modules.Button({ text: "View in TSS", tooltip: "Open this course on the TSS detail page", press: go }),
     ];
     if (canWithdraw(item)) {
       content.push(
-        new modules.Button({ text: "Drop", type: "Reject", tooltip: "Open the TSS detail page to withdraw from this course.", press: go })
+        new modules.Button({ text: "Drop", type: "Reject", tooltip: "Open the TSS detail page to withdraw", press: go })
       );
     }
     return new modules.Toolbar({ content });
@@ -719,7 +717,7 @@
     const button = new modules.Button({
       text: "Export Schedule",
       icon: "sap-icon://download",
-      tooltip: "Save the schedule shown here as a PNG image.",
+      tooltip: "Save the schedule as a PNG image",
       press: () => window.__tssregShared.scheduleExport.download(exportModel()),
     });
     button.addStyleClass("tssreg-cal-export");

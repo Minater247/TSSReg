@@ -298,7 +298,7 @@
       showSeparators: "Inner",
       columns: [
         column("Section"),
-        column("Type", "Lecture, discussion, lab, and so on."),
+        column("Type", "Lecture, discussion, lab, etc."),
         column("Days & time"),
         column("Location"),
         column("Instructor"),
@@ -317,7 +317,6 @@
       ),
     });
     table.addStyleClass("tssreg-find-table");
-    table.setTooltip(course.code + " " + pkg.label);
     return table;
   }
 
@@ -341,11 +340,11 @@
   function planButton(course, pkg) {
     const added = plans.hasSection(pkg.moduleId, pkg.pkgId);
     return new modules.Button({
-      text: added ? "Remove" : "Add to schedule",
+      text: added ? "Unplan" : "Plan",
       type: added ? "Transparent" : "Emphasized",
       tooltip: added
-        ? "Take this whole package out of the selected schedule."
-        : "Add this whole package to the selected schedule and draw it on the calendar. Nothing is enrolled until you choose Enroll.",
+        ? "Unplans this class"
+        : "Plans this class without enrolling",
       press: () => {
         plans.toggleSection(catalog.toSection(course, pkg, state.year, state.term));
         refreshResults();
@@ -360,7 +359,7 @@
         new modules.ObjectStatus({
           text: "Conflicts",
           state: "Warning",
-          tooltip: "Overlaps a class you are already enrolled in or have added to this schedule.",
+          tooltip: "Overlaps an enrolled or planned class",
         })
       );
       if (state.f.conflictMode === "collapse") {
@@ -381,7 +380,7 @@
     content.push(
       new modules.Button({
         text: "Enroll",
-        tooltip: "Open this course in the Schedule of Classes to enroll.",
+        tooltip: "Opens the Schedule of Classes",
         press: () => {
           location.hash = coursesPage.courseRoute(state.year, state.term, pkg.moduleId);
         },
@@ -549,18 +548,18 @@
     ui.instructor.attachBrowserEvent("focusin", loadInstructors);
 
     return [
-      field(" ", ui.query, "Subject and number, e.g. CSE 167 or CSE167. Or part of a title."),
+      field(" ", ui.query, "Subject and number, or part of a title"),
       field("Academic Year", ui.year, null, true),
       field("Term", ui.term, null, true),
-      field("Department", ui.dept, "The department that owns the course."),
-      field("Instructor", ui.instructor, "Pick a name from this term's instructors."),
+      field("Department", ui.dept, "Department that owns the course"),
+      field("Instructor", ui.instructor, "Instructors teaching this term"),
       daysField(),
     ];
   }
 
   function daysField() {
     const days = fieldWith(
-      captionLabel("Days of the Week", "Show only sections that meet on every chosen day."),
+      captionLabel("Days of the Week", "Sections that meet on every chosen day"),
       pillRow(DAY_PILLS, state.f.days, (key, pressed) => {
         state.f.days[key] = pressed;
         refreshResults();
@@ -578,10 +577,7 @@
     });
     toggle.addStyleClass("tssreg-find-pill");
     const conflicts = fieldWith(
-      captionLabel(
-        "Conflicts",
-        "Conflicting means overlapping a class you are enrolled in or have added to this schedule."
-      ),
+      captionLabel("Conflicts", "Overlaps an enrolled or planned class"),
       toggle
     );
     days.setWidth("auto");
@@ -666,7 +662,7 @@
       },
     });
 
-    const credits = rangeField("Credits", "Credit range.", {
+    const credits = rangeField("Credits", null, {
       min: state.credits.min,
       max: state.credits.max,
       step: 1,
@@ -677,7 +673,7 @@
       },
     });
 
-    const time = rangeField("Time of Day", "Only show sections that meet entirely within this window.", {
+    const time = rangeField("Time of Day", "Sections that fit entirely in this window", {
       min: catalog.TIME_MIN,
       max: catalog.TIME_MAX,
       step: TIME_STEP,
@@ -690,12 +686,12 @@
     });
 
     return [
-      field("Academic Level", levels, "Pick as many as you want."),
-      field("Building", buildings, "Where the section meets, e.g. Center Hall."),
-      field("Modality", modality, "How the class is taught: in person, remote, or a mix."),
-      field("Section ID", sectionId, "The exact class number, if you already know it."),
-      field("Seats Available", availability, "Open seats reported by TSS for the package."),
-      field("Wishlisted", wishlisted, "Courses already on your TSS wishlist."),
+      field("Academic Level", levels, null),
+      field("Building", buildings, "Building where the section meets"),
+      field("Modality", modality, "In person, remote, or hybrid"),
+      field("Section ID", sectionId, "Exact class number"),
+      field("Seats Available", availability, "Open seats reported by TSS"),
+      field("Wishlisted", wishlisted, "Courses on your TSS wishlist"),
       credits,
       time,
     ];

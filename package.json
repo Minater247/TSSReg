@@ -9,11 +9,13 @@
     "package": "npm run lint && node build.js && ./tools/package.sh && npm run validate",
     "icons": "./tools/make-icons.sh",
     "lint": "eslint src/",
-    "validate": "addons-linter dist/"
+    "validate": "addons-linter dist/",
+    "sign": "npm run package && web-ext sign --source-dir=dist --artifacts-dir=build --channel=unlisted"
   },
   "homepage": "https://github.com/Minater247/TSSReg",
   "devDependencies": {
     "addons-linter": "^10",
-    "eslint": "^9"
+    "eslint": "^9",
+    "web-ext": "^10.7.0"
   }
 }
