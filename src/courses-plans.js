@@ -51,7 +51,7 @@
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       saved = raw ? JSON.parse(raw) : null;
-    } catch (e) {
+    } catch {
       saved = null;
     }
     if (!saved || !Array.isArray(saved.list)) return;
@@ -65,7 +65,7 @@
   function persist() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
+    } catch {
       return;
     }
   }

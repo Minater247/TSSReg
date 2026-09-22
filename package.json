@@ -6,8 +6,14 @@
   "scripts": {
     "build": "node build.js",
     "test": "node test/load-order.test.js && node test/courses-page.test.js && node test/courses-detail.test.js && node test/calendar-layout.test.js && node test/export.test.js",
-    "package": "node build.js && ./tools/package.sh",
-    "icons": "./tools/make-icons.sh"
+    "package": "npm run lint && node build.js && ./tools/package.sh && npm run validate",
+    "icons": "./tools/make-icons.sh",
+    "lint": "eslint src/",
+    "validate": "addons-linter dist/"
   },
-  "homepage": "https://github.com/Minater247/TSSReg"
+  "homepage": "https://github.com/Minater247/TSSReg",
+  "devDependencies": {
+    "addons-linter": "^10",
+    "eslint": "^9"
+  }
 }

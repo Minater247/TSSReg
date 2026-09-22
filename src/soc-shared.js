@@ -244,7 +244,7 @@
       let json;
       try {
         json = JSON.parse(trimmed);
-      } catch (e) {
+      } catch {
         continue;
       }
       if (!isModuleJson(json)) continue;

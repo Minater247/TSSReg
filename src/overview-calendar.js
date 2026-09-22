@@ -284,7 +284,7 @@
     container.getItems().forEach((item) => {
       if (item !== strip && item.setVisible) item.setVisible(false);
     });
-    const counter = [...cardElement().querySelectorAll(".sapMText, .sapMLabel")].find((el) =>
+    const counter = [...shared.cardElement(CARD).querySelectorAll(".sapMText, .sapMLabel")].find((el) =>
       /^\d+\s+classes$/.test(el.textContent.trim())
     );
     const control = counter && sap.ui.getCore().byId(counter.id);
