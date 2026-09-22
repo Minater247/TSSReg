@@ -1,0 +1,44 @@
+name: package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build and package
+        run: npm run package
+
+      - name: Check manifest version is unreleased
+        run: |
+          version="$(node -p "require('./src/manifest.json').version")"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "v$version is already tagged; bump version in src/manifest.json before release"
+            exit 1
+          fi
+          echo "v$version is unreleased"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tssreg
+          path: build/

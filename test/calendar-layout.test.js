@@ -23,7 +23,7 @@ function loadCalendar() {
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   const exposed =
     body +
-    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage };";
+    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, examLabel, eventsByPackage, finalRooms, buildings, finalRoomLabels };";
 
   const plain = (value) => String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
   const win = {
@@ -33,6 +33,14 @@ function loadCalendar() {
         plainId: plain,
         scheduleKey: (year, term, moduleId, sectionId) => [plain(year), plain(term), plain(moduleId), plain(sectionId)].join("|"),
         loadMeetings: () => Promise.resolve({}),
+        finalRoomKey: (moduleId, date) =>
+          plain(moduleId) +
+          "|" +
+          date.getUTCFullYear() +
+          "-" +
+          String(date.getUTCMonth() + 1).padStart(2, "0") +
+          "-" +
+          String(date.getUTCDate()).padStart(2, "0"),
       },
       onUiUpdated() {},
       whenSapReady: (fn) => fn(),
@@ -333,6 +341,161 @@ check(
   "unknown day codes in the fallback are dropped",
   cal.meetingsFor(enrolled, { EventId: "00009999", EventScheduleDays: "MO/XX", StartTime: { ms: 54000000 }, EndTime: { ms: 57000000 } }),
   [{ day: "MO", startMin: 900, endMin: 950 }]
+);
+
+// ---------- final exams ----------
+function meeting(type, typeText, startMin, endMin, date, seqnr) {
+  return {
+    MeetingType: type,
+    MeetingTypeText: typeText,
+    StartTime: { ms: startMin * 60000 },
+    EndTime: { ms: endMin * 60000 },
+    EventDate: date,
+    Seqnr: seqnr || "001",
+  };
+}
+
+cal.buildings["Center Hall"] = "CENTR";
+cal.buildings["Franklin Antonio Hall"] = "FAH";
+
+function finalsFixture(schedule, room) {
+  cal.finalRooms["9462|2026-12-11"] = room;
+  const row = {
+    EventPackageId: "PKG1",
+    SmObjid: "0009462",
+    SmShort: "CSE-123",
+    SmStext: "Computer Networks",
+    SmStatusText: "Booked",
+  };
+  cal.eventsByPackage.PKG1 = [
+    { EventId: "E1", EventStext: "A00", InstrText: "Staff", EventSchedule: { results: schedule } },
+  ];
+  return cal.finalsItems([{ row }]);
+}
+
+const examDate = new Date(Date.UTC(2026, 11, 11));
+const withFinal = finalsFixture(
+  [
+    meeting("", "", 1020, 1070, new Date(Date.UTC(2026, 11, 7))),
+    meeting("FI", "Final Examination", 1140, 1379, examDate),
+  ],
+  "Center Hall Room 115"
+);
+
+check("only the exam meeting is drawn on the finals tab", withFinal.length, 1);
+check(
+  "the exam lands on the weekday of its own date",
+  [withFinal[0].day, withFinal[0].startMin, withFinal[0].endMin],
+  ["FR", 1140, 1379]
+);
+check("the service's wording is shortened to fit a block", withFinal[0].method, "Final Exam");
+check("a published room keeps its number behind a short building code", withFinal[0].room, "CENTR 115");
+check("the full room keeps the number for the detail", withFinal[0].roomFull, "CENTR - 115");
+check(
+  "each exam gets a key of its own",
+  withFinal[0].key,
+  "final|PKG1|E1|001"
+);
+check("the course status rides along", withFinal[0].status, "enrolled");
+
+// ---------- exam wording ----------
+check("the service's own wording is shortened", cal.examLabel("Final Examination"), "Final Exam");
+check("a missing wording still names the session", cal.examLabel(""), "Final Exam");
+check("wording that is already short is left alone", cal.examLabel("Final Exam"), "Final Exam");
+check("unfamiliar wording is left intact", cal.examLabel("Take-home Assessment"), "Take-home Assessment");
+
+// ---------- exam rooms ----------
+const noRoom = finalsFixture([meeting("FI", "Final Examination", 1140, 1379, examDate)], undefined);
+check("an unpublished room says so on the block", noRoom[0].room, "Room TBA");
+check("an unpublished room says so in the detail", noRoom[0].roomFull, "Room not posted yet");
+
+// ---------- room wording ----------
+check(
+  "a long building name becomes its campus code",
+  cal.finalRoomLabels("Franklin Antonio Hall Room 1301"),
+  { short: "FAH 1301", full: "FAH - 1301" }
+);
+check(
+  "a building missing from the directory keeps its full name rather than guessing",
+  cal.finalRoomLabels("Some New Hall Room 12"),
+  { short: "Some New Hall 12", full: "Some New Hall - 12" }
+);
+check(
+  "room text in an unexpected shape is passed through untouched",
+  cal.finalRoomLabels("Remote"),
+  { short: "Remote", full: "Remote" }
+);
+check("no room text yields no labels", cal.finalRoomLabels(""), null);
+
+// ---------- unusable exam rows ----------
+check(
+  "an exam with no date is dropped rather than drawn on the wrong day",
+  finalsFixture([meeting("FI", "Final Examination", 1140, 1379, null)], "Center Hall Room 115").length,
+  0
+);
+check(
+  "an exam that ends before it starts is dropped",
+  finalsFixture([meeting("FI", "Final Examination", 1379, 1140, examDate)], "Center Hall Room 115").length,
+  0
+);
+check(
+  "a date arriving as an OData string is still placed",
+  finalsFixture(
+    [meeting("FI", "Final Examination", 1140, 1379, "/Date(" + examDate.getTime() + ")/")],
+    "Center Hall Room 115"
+  ).map((item) => item.day),
+  ["FR"]
+);
+
+// ---------- replacing the calendar contents ----------
+function stubItem(name) {
+  return { name, destroyed: false, destroy() { this.destroyed = true; } };
+}
+
+function stubRoot(items) {
+  return {
+    items: items.slice(),
+    getItems() { return this.items; },
+    removeAllItems() { return this.items.splice(0, this.items.length); },
+    addItem(item) { this.items.push(item); },
+  };
+}
+
+const oldChrome = stubItem("chrome");
+const oldBody = stubItem("body");
+const root = stubRoot([oldChrome, oldBody]);
+const newChrome = stubItem("chrome2");
+const newBody = stubItem("body2");
+cal.swapContent(root, [newChrome, newBody]);
+
+check(
+  "the replacement contents take the root's place",
+  root.getItems().map((item) => item.name),
+  ["chrome2", "body2"]
+);
+check(
+  "the outgoing contents survive until the replacement has rendered",
+  [oldChrome.destroyed, oldBody.destroyed],
+  [false, false]
+);
+
+cal.onRootRendered();
+check(
+  "the outgoing contents are released once the replacement has rendered",
+  [oldChrome.destroyed, oldBody.destroyed],
+  [true, true]
+);
+check(
+  "releasing the outgoing contents leaves the replacement alone",
+  [newChrome.destroyed, newBody.destroyed],
+  [false, false]
+);
+
+cal.onRootRendered();
+check(
+  "a later render has nothing left to release",
+  root.getItems().map((item) => item.name),
+  ["chrome2", "body2"]
 );
 
 console.log(passed + " passed, " + failures.length + " failed");

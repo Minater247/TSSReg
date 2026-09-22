@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TSSReg",
   "version": "0.1.0",
-  "description": "Unofficial rework of to UCSD's TSS to improve the user experience",
+  "description": "Unofficial rework of UCSD's TSS to improve the user experience",
   "homepage_url": "https://github.com/Minater247/TSSReg",
   "icons": {
     "16": "icons/icon-16.png",
@@ -48,6 +48,7 @@
       ],
       "js": [
         "soc-shared.js",
+        "shell-session.js",
         "soc-filters.js",
         "soc-credits-range.js",
         "soc-dow-buttons.js",

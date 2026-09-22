@@ -132,7 +132,8 @@
     if (open) {
       const meta = [];
       const cap = maxUnitsFor(open.timelimit);
-      if (cap != null) meta.push(enrolledUnits() + " of " + cap + " units");
+      meta.push(enrolledUnits() + " units enrolled");
+      if (cap != null) meta.push(cap + " unit cap");
       if (open.waitlists) meta.push("Waitlists " + String(open.waitlists).toLowerCase());
       notices.push({
         kind: "open",
@@ -157,7 +158,7 @@
     if (next) {
       const meta = [];
       const cap = maxUnitsFor(next.timelimit);
-      if (cap != null) meta.push("Up to " + cap + " units");
+      if (cap != null) meta.push(cap + " unit cap");
       notices.push({
         kind: "info",
         text: "Your " + (next.timelimit_Text || "enrollment") + " enrollment hasn't opened yet",

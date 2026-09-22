@@ -3,6 +3,9 @@
   const LOADING_ID = "tssreg-courses-loading";
   const POPOVER_ID = "tssreg-courses-detail";
   const FINDER_ID = "tssreg-courses-finder";
+  const MODE_SCHEDULE = "schedule";
+  const MODE_FINALS = "finals";
+  const FINAL_TYPE = "FI";
   const HIDDEN_CLASS = "tssreg-native-list-hidden";
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
   const ITEMS_EVENT = "tssreg:schedule-items";
@@ -21,11 +24,15 @@
   const catalog = window.__tssregShared.catalog;
   const coursesPage = window.__tssregShared.coursesPage;
   const { MIN_BLOCK_HEIGHT, BREATHING_ROOM, TRACK_SLACK } = window.__tssregShared.scheduleExport;
-  const { DAY_NAMES, DAY_ORDER, isCoursesRoute, pageControl, listControl } = coursesPage;
+  const { DAY_NAMES, DAY_ORDER, DAY_FROM_DOW, isCoursesRoute, pageControl, listControl } = coursesPage;
   const { rangeLabel, meridiemLabel, fullRangeLabel, dayListLabel } = coursesPage;
   let modules = null;
   const eventsByPackage = {};
   const meetingsBySection = {};
+  const finalRooms = {};
+  const buildings = {};
+  const inFlight = [];
+  const retired = [];
   const modulesLoaded = {};
   const pending = {};
   const pendingModules = {};
@@ -34,6 +41,9 @@
   let openBlockKey = null;
   let publishedItems = null;
   let publishedSignature = null;
+  let mode = MODE_SCHEDULE;
+  let dayDates = null;
+  let readEpoch = 0;
 
   window.__tssregShared.whenSapReady(() => {
     sap.ui.require(
@@ -54,10 +64,12 @@
         "sap/m/Dialog",
         "sap/m/Input",
         "sap/m/MessageBox",
+        "sap/m/IconTabHeader",
+        "sap/m/IconTabFilter",
         "sap/ui/core/HTML",
       ],
-      (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML) => {
-        modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML };
+      (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, IconTabHeader, IconTabFilter, HTML) => {
+        modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, IconTabHeader, IconTabFilter, HTML };
       }
     );
   });
@@ -82,18 +94,38 @@
     if (toolbar && toolbar.getVisible() === hidden) toolbar.setVisible(!hidden);
   }
 
+  function dropRead(entry) {
+    const index = inFlight.indexOf(entry);
+    if (index !== -1) inFlight.splice(index, 1);
+  }
+
+  function abortReads() {
+    readEpoch += 1;
+    inFlight.splice(0).forEach((entry) => {
+      if (entry.handle && entry.handle.abort) entry.handle.abort();
+    });
+    Object.keys(pending).forEach((key) => delete pending[key]);
+  }
+
   function ensureEvents(entries) {
     entries.forEach(({ path, row, model }) => {
       const pkg = row.EventPackageId;
       if (eventsByPackage[pkg] || pending[pkg]) return;
       pending[pkg] = true;
-      model.read(path + "/Event", {
+      const entry = { epoch: readEpoch };
+      inFlight.push(entry);
+      entry.handle = model.read(path + "/Event", {
+        urlParameters: { $expand: "EventSchedule" },
         success: (data) => {
+          dropRead(entry);
+          if (entry.epoch !== readEpoch) return;
           delete pending[pkg];
           eventsByPackage[pkg] = data.results || (data.EventId ? [data] : []);
           apply();
         },
         error: () => {
+          dropRead(entry);
+          if (entry.epoch !== readEpoch) return;
           delete pending[pkg];
           eventsByPackage[pkg] = [];
           apply();
@@ -120,11 +152,15 @@
     Object.keys(groups).forEach((name) => {
       const group = groups[name];
       group.keys.forEach((key) => (pendingModules[key] = true));
-      catalog
-        .loadMeetings(group.ids, group.year, group.term)
-        .catch(() => ({}))
-        .then((found) => {
+      Promise.all([
+        catalog.loadMeetings(group.ids, group.year, group.term).catch(() => ({})),
+        catalog.loadFinalRooms(group.ids, group.year, group.term).catch(() => ({})),
+        catalog.loadBuildings(group.year, group.term).catch(() => ({})),
+      ])
+        .then(([found, rooms, halls]) => {
           Object.keys(found).forEach((key) => (meetingsBySection[key] = found[key]));
+          Object.keys(rooms).forEach((key) => (finalRooms[key] = rooms[key]));
+          Object.keys(halls).forEach((key) => (buildings[key] = halls[key]));
           group.keys.forEach((key) => {
             delete pendingModules[key];
             modulesLoaded[key] = true;
@@ -233,6 +269,95 @@
       });
     });
     return items;
+  }
+
+  function eventDate(value) {
+    const match = /\/Date\((-?\d+)\)\//.exec(String(value));
+    if (match) return new Date(+match[1]);
+    return value instanceof Date ? value : null;
+  }
+
+  function finalRows(event) {
+    const schedule = event.EventSchedule;
+    const rows = (schedule && schedule.results) || (Array.isArray(schedule) ? schedule : []);
+    return rows.filter((row) => row.MeetingType === FINAL_TYPE);
+  }
+
+  function finalRoomLabels(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+    const match = /^(.*?)\s+Room\s+(.+)$/i.exec(raw);
+    if (!match) return { short: raw, full: raw };
+    const code = buildings[match[1].trim()] || match[1].trim();
+    return { short: code + " " + match[2].trim(), full: code + " - " + match[2].trim() };
+  }
+
+  function examLabel(text) {
+    const label = String(text || "").trim();
+    if (!label) return "Final Exam";
+    return label.replace(/\bExamination\b/, "Exam");
+  }
+
+  function finalsItems(entries) {
+    const items = [];
+    entries.forEach(({ row }) => {
+      const events = eventsByPackage[row.EventPackageId];
+      if (!events) return;
+      const status = statusOf(row);
+      events.forEach((event) => {
+        finalRows(event).forEach((meeting) => {
+          const date = eventDate(meeting.EventDate);
+          const day = date && DAY_FROM_DOW[((date.getUTCDay() + 6) % 7) + 1];
+          const startMin = minutesOf(meeting.StartTime);
+          const endMin = minutesOf(meeting.EndTime);
+          if (!day || startMin == null || endMin == null || endMin <= startMin) return;
+          const labels = finalRoomLabels(finalRooms[catalog.finalRoomKey(row.SmObjid, date)]);
+          items.push({
+            key: "final|" + row.EventPackageId + "|" + event.EventId + "|" + meeting.Seqnr,
+            day,
+            startMin,
+            endMin,
+            status,
+            date,
+            courseCode: row.SmShort || "",
+            courseTitle: row.SmStext || "",
+            section: event.EventStext || "",
+            method: examLabel(meeting.MeetingTypeText),
+            room: labels ? labels.short : "Room TBA",
+            roomFull: labels ? labels.full : "Room not posted yet",
+            instructor: event.InstrText || "",
+            event,
+            row,
+          });
+        });
+      });
+    });
+    return items;
+  }
+
+  function monthDay(date) {
+    return date.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+  }
+
+  function finalsDayDates(items) {
+    const out = {};
+    items.forEach((item) => {
+      out[item.day] = DAY_NAMES[item.day] + " " + monthDay(item.date);
+    });
+    return out;
+  }
+
+  function finalsRangeLabel(items) {
+    const times = items.map((item) => item.date.getTime());
+    const first = new Date(Math.min(...times));
+    const last = new Date(Math.max(...times));
+    const year = last.toLocaleDateString("en-US", { timeZone: "UTC", year: "numeric" });
+    const span = monthDay(first) === monthDay(last) ? monthDay(first) : monthDay(first) + " to " + monthDay(last);
+    return span + ", " + year;
+  }
+
+  function dayLabel(day) {
+    return (dayDates && dayDates[day]) || DAY_NAMES[day];
   }
 
   function plannedItems() {
@@ -686,9 +811,14 @@
     return box;
   }
 
+  function exportTitle() {
+    if (mode === MODE_FINALS) return "Final Exams";
+    const plan = plans.current();
+    return plan ? plan.name : "";
+  }
+
   function exportModel() {
     if (!layout) return null;
-    const plan = plans.current();
     const items = layout.placed.map(({ item }) => ({
       day: item.day,
       startMin: item.startMin,
@@ -704,9 +834,9 @@
       instructor: item.instructor || "",
     }));
     return {
-      planName: plan ? plan.name : "",
+      planName: exportTitle(),
       range: layout.range,
-      days: layout.days.map((day) => ({ key: day, label: DAY_NAMES[day] })),
+      days: layout.days.map((day) => ({ key: day, label: dayLabel(day) })),
       hours: hourMarks(layout.range).map((minute) => ({ minute, label: meridiemLabel(minute) })),
       legend: legendModel(items),
       items,
@@ -717,19 +847,29 @@
     const button = new modules.Button({
       text: "Export Schedule",
       icon: "sap-icon://download",
-      tooltip: "Save the schedule as a PNG image",
+      tooltip: "Saves a PNG image",
       press: () => window.__tssregShared.scheduleExport.download(exportModel()),
     });
     button.addStyleClass("tssreg-cal-export");
     return button;
   }
 
+  function finalsCaption(items) {
+    const text = items.length ? "Finals week: " + finalsRangeLabel(items) : "Final exams";
+    const caption = new modules.Label({ text });
+    caption.addStyleClass("tssreg-cal-plan-label");
+    const box = new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [caption] });
+    box.addStyleClass("tssreg-cal-plan");
+    return box;
+  }
+
   function buildChrome(items) {
     const bar = new modules.HBox({ renderType: "Bare", alignItems: "Center", wrap: "Wrap" });
     bar.addStyleClass("tssreg-cal-toolbar");
-    bar.addItem(planControls());
+    bar.addItem(buildTabs());
+    bar.addItem(mode === MODE_FINALS ? finalsCaption(items) : planControls());
     bar.addItem(legendControl(items));
-    bar.addItem(exportButton());
+    if (items.length) bar.addItem(exportButton());
     return bar;
   }
 
@@ -765,7 +905,7 @@
         placed.push({ control, item });
         track.addItem(control);
       });
-      const header = labelled(DAY_NAMES[day], "tssreg-cal-day-header", "Center");
+      const header = labelled(dayLabel(day), "tssreg-cal-day-header", "Center");
       const column = new modules.VBox({ renderType: "Bare", items: [header, track] });
       column.addStyleClass("tssreg-cal-day");
       dayRow.addItem(column);
@@ -774,11 +914,8 @@
     const body = new modules.HBox({ renderType: "Bare", items: [axis, dayRow] });
     body.addStyleClass("tssreg-cal-body");
 
-    const root = new modules.VBox(ROOT_ID, { renderType: "Bare", items: [buildChrome(items), body] });
-    root.addStyleClass("tssreg-cal");
-    layout = { range, days, placed, labels, tracks, axis, root };
-    root.addEventDelegate({ onAfterRendering: applyGeometry });
-    return root;
+    layout = { range, days, placed, labels, tracks, axis, root: calendarRoot() };
+    return [buildChrome(items), body];
   }
 
   function applyThemeVars(dom) {
@@ -864,6 +1001,7 @@
 
   function signatureOf(items) {
     return JSON.stringify([
+      mode,
       plans.signature(),
       items.map((item) => [
         item.key,
@@ -885,7 +1023,7 @@
   }
 
   function showLoading(page, list, loaded, total) {
-    const text = "Loading meeting times — " + loaded + " of " + total + " course" + (total === 1 ? "" : "s");
+    const text = "Loading meeting times: " + loaded + " of " + total + " course" + (total === 1 ? "" : "s");
     let box = sap.ui.getCore().byId(LOADING_ID);
     if (!box) {
       box = new modules.VBox(LOADING_ID, {
@@ -903,8 +1041,55 @@
     coursesPage.mountAfterList(page, list, box, FINDER_ID);
   }
 
+  function buildTabs() {
+    const header = new modules.IconTabHeader({
+      selectedKey: mode,
+      backgroundDesign: "Transparent",
+      items: [
+        new modules.IconTabFilter({ key: MODE_SCHEDULE, text: "Schedule" }),
+        new modules.IconTabFilter({ key: MODE_FINALS, text: "Finals" }),
+      ],
+      select: (event) => {
+        const key = event.getParameter("key");
+        if (key === mode) return;
+        mode = key;
+        closePopover();
+        apply();
+      },
+    });
+    header.addStyleClass("tssreg-cal-tabs");
+    return header;
+  }
+
+  function buildEmpty() {
+    const text = new modules.Text({ text: "No final exams are scheduled for your courses yet." });
+    text.addStyleClass("tssreg-cal-empty");
+    layout = null;
+    return [buildChrome([]), text];
+  }
+
+  function onRootRendered() {
+    retired.splice(0).forEach((control) => control.destroy());
+    applyGeometry();
+  }
+
+  function calendarRoot() {
+    const existing = sap.ui.getCore().byId(ROOT_ID);
+    if (existing) return existing;
+    const root = new modules.VBox(ROOT_ID, { renderType: "Bare" });
+    root.addStyleClass("tssreg-cal");
+    root.addEventDelegate({ onAfterRendering: onRootRendered });
+    return root;
+  }
+
+  function swapContent(root, items) {
+    root.removeAllItems().forEach((control) => retired.push(control));
+    items.forEach((item) => root.addItem(item));
+  }
+
   function destroyCalendar() {
     closePopover();
+    retired.splice(0).forEach((control) => control.destroy());
     const existing = sap.ui.getCore().byId(ROOT_ID);
     if (existing) existing.destroy();
     layout = null;
@@ -912,6 +1097,7 @@
   }
 
   function teardown() {
+    abortReads();
     publishItems(null);
     removeLoading();
     destroyCalendar();
@@ -945,21 +1131,23 @@
     }
     removeLoading();
 
-    const items = scheduleItems(entries).concat(plannedItems());
-    publishItems(items);
-    if (!items.length) {
+    const scheduled = scheduleItems(entries).concat(plannedItems());
+    publishItems(scheduled);
+    if (!scheduled.length) {
       setNativeListHidden(list, false);
       destroyCalendar();
       return;
     }
     setNativeListHidden(list, true);
 
-    const signature = signatureOf(items);
-    let root = sap.ui.getCore().byId(ROOT_ID);
-    if (signature !== rendered || !root) {
+    const showing = mode === MODE_FINALS ? finalsItems(entries) : scheduled;
+    dayDates = mode === MODE_FINALS && showing.length ? finalsDayDates(showing) : null;
+
+    const signature = signatureOf(showing);
+    const root = calendarRoot();
+    if (signature !== rendered || !root.getItems().length) {
       closePopover();
-      if (root) root.destroy();
-      root = buildCalendar(items);
+      swapContent(root, showing.length ? buildCalendar(showing) : buildEmpty());
       rendered = signature;
     }
     coursesPage.mountAfterList(page, list, root, FINDER_ID);
@@ -969,4 +1157,7 @@
 
   window.__tssregShared.onUiUpdated(apply);
   window.addEventListener(plans.CHANGE_EVENT, apply);
+  window.addEventListener("hashchange", () => {
+    if (!isCoursesRoute()) abortReads();
+  });
 })();

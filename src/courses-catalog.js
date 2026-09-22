@@ -313,6 +313,52 @@
     return fetchEntity("YUCSD_CON_MODULE_SCHED", wanted, schedScope(year, term)).then(meetingsByModule);
   }
 
+  function finalRoomKey(moduleId, date) {
+    return (
+      stripPad(moduleId) +
+      "|" +
+      date.getUTCFullYear() +
+      "-" +
+      String(date.getUTCMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getUTCDate()).padStart(2, "0")
+    );
+  }
+
+  function finalRoomsByModule(rows) {
+    const out = {};
+    rows.forEach((row) => {
+      String(row.Sched || "")
+        .split("\n")
+        .forEach((line) => {
+          const match = /^Final Examination\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\b[^@]*@\s*(.+)$/.exec(line.trim());
+          if (!match) return;
+          const date = new Date(Date.UTC(+match[3], +match[1] - 1, +match[2]));
+          out[finalRoomKey(row.ModuleID, date)] = match[4].trim();
+        });
+    });
+    return out;
+  }
+
+  function loadBuildings(year, term) {
+    const apply = "filter(" + sessionScope(year, term) + ")/groupby((BuildingID,BuildingText))";
+    return getRows("YUCSD_CON_MODULE_BLDG?" + CLIENT + "&$apply=" + encodeURIComponent(apply)).then((rows) => {
+      const out = {};
+      rows.forEach((row) => {
+        const text = String(row.BuildingText || "").trim();
+        const id = String(row.BuildingID || "").trim();
+        if (text && id) out[text] = id;
+      });
+      return out;
+    });
+  }
+
+  function loadFinalRooms(ids, year, term) {
+    const wanted = ids.map(stripPad).filter(Boolean);
+    if (!wanted.length) return Promise.resolve({});
+    return fetchEntity("YUCSD_CON_EVENTS", wanted, eventScope(year, term)).then(finalRoomsByModule);
+  }
+
   function fetchSections(ids, year, term) {
     if (!ids.length) return Promise.resolve({});
     return Promise.all([
@@ -395,6 +441,9 @@
     loadInstructors,
     loadCreditRange,
     loadMeetings,
+    loadFinalRooms,
+    loadBuildings,
+    finalRoomKey,
     scheduleKey,
     plainId: stripPad,
     search,

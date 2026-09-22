@@ -13,8 +13,9 @@
 
 .tssreg-cal .tssreg-cal-toolbar {
   gap: 16px;
-  padding: 4px 4px 10px;
+  padding: 4px 4px 0;
   row-gap: 8px;
+  border-bottom: 1px solid var(--tssreg-border);
 }
 
 .tssreg-cal .tssreg-cal-plan {
@@ -63,7 +64,6 @@
 
 .tssreg-cal .tssreg-cal-body {
   align-items: flex-start;
-  border-top: 1px solid var(--tssreg-border);
   overflow-x: auto;
   overflow-y: hidden;
   background-color: var(--tssreg-bg);
@@ -427,4 +427,19 @@
 
 .tssreg-find .tssreg-find-bar .sapUiAFLayoutItem:has(.tssreg-find-slider) {
   flex-basis: 24rem !important;
+}
+
+.tssreg-cal .tssreg-cal-tabs {
+  flex: 0 0 auto;
+  box-shadow: none !important;
+}
+
+.tssreg-cal .tssreg-cal-tabs .sapMITBHead {
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.tssreg-cal-empty {
+  padding: 1.5rem 1rem;
+  color: var(--tssreg-muted, #556b82);
 }

@@ -3,6 +3,7 @@
   const CARD = "card12";
   const CARD_TITLE = "My Schedule";
   const STRIP_ID = "tssreg-week-strip";
+  const HEADER_TAG = "tssregHeaderNav";
   const MY_COURSES = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/MyModules";
   const CLASS_EVENT_TYPE = "01";
   const EVENTS_URL =
@@ -291,6 +292,23 @@
     if (control && control.getVisible && control.getVisible()) control.setVisible(false);
   }
 
+  function headerItem(cardEl) {
+    const titleEl = cardEl.querySelector('[id$="ovpHeaderTitle"]');
+    const itemEl = titleEl && titleEl.closest(".sapMLIB");
+    return itemEl ? sap.ui.getCore().byId(itemEl.id) : null;
+  }
+
+  function retargetHeader(cardEl) {
+    const item = headerItem(cardEl);
+    const handlers = item && item.mEventRegistry && item.mEventRegistry.press;
+    if (!handlers) return;
+    const foreign = handlers.filter((entry) => !(entry.oData && entry.oData[HEADER_TAG]));
+    if (!foreign.length) return;
+    const mine = handlers.length - foreign.length;
+    foreign.forEach((entry) => item.detachPress(entry.fFunction, entry.oListener));
+    if (!mine) item.attachPress({ [HEADER_TAG]: true }, () => shared.navigate({ url: MY_COURSES }));
+  }
+
   function applyCardTitle() {
     const titleEl = shared.cardElement(CARD).querySelector('[id$="ovpHeaderTitle"]');
     const control = titleEl && sap.ui.getCore().byId(titleEl.id);
@@ -303,6 +321,7 @@
     if (!byDay) return;
 
     const cardEl = shared.cardElement(CARD);
+    if (cardEl) retargetHeader(cardEl);
     const contentEl = cardEl && cardEl.querySelector('[id$="ovpCardContentContainer"]');
     const container = contentEl && sap.ui.getCore().byId(contentEl.id);
     if (!container || !container.getItems) return;
