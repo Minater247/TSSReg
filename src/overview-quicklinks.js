@@ -6,8 +6,10 @@
 
   let modules = null;
 
-  sap.ui.require(["sap/m/VBox", "sap/m/Image", "sap/m/Text"], (VBox, Image, Text) => {
-    modules = { VBox, Image, Text };
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(["sap/m/VBox", "sap/m/Image", "sap/m/Text"], (VBox, Image, Text) => {
+      modules = { VBox, Image, Text };
+    });
   });
 
   function tile(link) {

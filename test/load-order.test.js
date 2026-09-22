@@ -100,20 +100,36 @@ function check(name, actual, expected) {
   else failures.push(name + "\n    expected " + e + "\n    actual   " + a);
 }
 
-const { win, context } = sandbox();
-vm.createContext(context);
+function loadAll(withSap) {
+  const { win, context } = sandbox();
+  if (!withSap) delete context.sap;
+  vm.createContext(context);
+  const errors = {};
+  scripts.forEach((file) => {
+    try {
+      vm.runInContext(fs.readFileSync(path.join(SRC, file), "utf8"), context, { filename: file });
+      errors[file] = "";
+    } catch (err) {
+      errors[file] = err.message;
+    }
+  });
+  return { win, errors };
+}
 
-scripts.forEach((file) => {
-  let error = "";
-  try {
-    vm.runInContext(fs.readFileSync(path.join(SRC, file), "utf8"), context, { filename: file });
-  } catch (err) {
-    error = err.message;
-  }
-  check(file + " loads without throwing", error, "");
-});
+// ---------- manifest order ----------
+const booted = loadAll(true);
+scripts.forEach((file) => check(file + " loads without throwing", booted.errors[file], ""));
 
-const shared = win.__tssregShared || {};
+// ---------- loading before SAPUI5 boots ----------
+const preBoot = loadAll(false);
+check(
+  "every script survives loading before SAPUI5 exists",
+  scripts.filter((file) => preBoot.errors[file]),
+  []
+);
+
+// ---------- package contents ----------
+const shared = booted.win.__tssregShared || {};
 
 check(
   "every script is registered in the manifest",

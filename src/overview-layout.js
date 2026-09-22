@@ -83,20 +83,22 @@
   let cache = null;
   let modules = null;
 
-  sap.ui.require(
-    [
-      "sap/ui/model/json/JSONModel",
-      "sap/m/StandardListItem",
-      "sap/m/List",
-      "sap/m/Panel",
-      "sap/m/VBox",
-      "sap/m/Text",
-      "sap/ui/layout/cssgrid/CSSGrid",
-    ],
-    (JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid) => {
-      modules = { JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid };
-    }
-  );
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(
+      [
+        "sap/ui/model/json/JSONModel",
+        "sap/m/StandardListItem",
+        "sap/m/List",
+        "sap/m/Panel",
+        "sap/m/VBox",
+        "sap/m/Text",
+        "sap/ui/layout/cssgrid/CSSGrid",
+      ],
+      (JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid) => {
+        modules = { JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid };
+      }
+    );
+  });
 
   function listControl(card) {
     const cardEl = shared.cardElement(card);

@@ -35,30 +35,32 @@
   let publishedItems = null;
   let publishedSignature = null;
 
-  sap.ui.require(
-    [
-      "sap/ui/core/theming/Parameters",
-      "sap/m/Text",
-      "sap/m/Label",
-      "sap/m/VBox",
-      "sap/m/HBox",
-      "sap/m/Button",
-      "sap/m/Popover",
-      "sap/m/Toolbar",
-      "sap/m/ToolbarSpacer",
-      "sap/m/ProgressIndicator",
-      "sap/m/MenuButton",
-      "sap/m/Menu",
-      "sap/m/MenuItem",
-      "sap/m/Dialog",
-      "sap/m/Input",
-      "sap/m/MessageBox",
-      "sap/ui/core/HTML",
-    ],
-    (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML) => {
-      modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML };
-    }
-  );
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(
+      [
+        "sap/ui/core/theming/Parameters",
+        "sap/m/Text",
+        "sap/m/Label",
+        "sap/m/VBox",
+        "sap/m/HBox",
+        "sap/m/Button",
+        "sap/m/Popover",
+        "sap/m/Toolbar",
+        "sap/m/ToolbarSpacer",
+        "sap/m/ProgressIndicator",
+        "sap/m/MenuButton",
+        "sap/m/Menu",
+        "sap/m/MenuItem",
+        "sap/m/Dialog",
+        "sap/m/Input",
+        "sap/m/MessageBox",
+        "sap/ui/core/HTML",
+      ],
+      (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML) => {
+        modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, HTML };
+      }
+    );
+  });
 
   function moduleEntries(list) {
     const binding = list.getBinding && list.getBinding("items");

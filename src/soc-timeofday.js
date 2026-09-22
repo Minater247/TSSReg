@@ -38,25 +38,16 @@
     if (!layout) return;
     if (layout.querySelector("#tssreg-timeofday-item")) return;
 
-    const item = document.createElement("div");
-    item.id = "tssreg-timeofday-item";
-    item.innerHTML =
-      '<div class="sapUiVlt sapuiVlt">' +
-      '<div class="sapUiVltCell sapuiVltCell">' +
-      '<label class="sapMLabel sapUiSelectable sapMLabelMaxWidth sapUiMdcFilterBarBaseLabel" style="text-align: left;">' +
-      '<div class="sapMLabelInner" style="justify-content: flex-start;">' +
-      '<span class="sapMLabelTextWrapper"><bdi>Time of Day</bdi></span>' +
-      '<span class="sapMLabelColonAndRequired" data-colon=":" aria-hidden="true"></span>' +
-      "</div>" +
-      "</label>" +
-      "</div>" +
-      '<div class="sapUiVltCell sapuiVltCell">' +
-      '<div class="sapUiMdcFieldBase">' +
-      '<div class="tssreg-time-mount"></div>' +
-      '<span class="sapMText tssreg-time-caption"></span>' +
-      "</div>" +
-      "</div>" +
-      "</div>";
+    const { item, cell } = window.__tssregShared.filterFieldItem("tssreg-timeofday-item", "Time of Day");
+    const field = document.createElement("div");
+    field.className = "sapUiMdcFieldBase";
+    const mount = document.createElement("div");
+    mount.className = "tssreg-time-mount";
+    const caption = document.createElement("span");
+    caption.className = "sapMText tssreg-time-caption";
+    field.appendChild(mount);
+    field.appendChild(caption);
+    cell.appendChild(field);
     layout.appendChild(item);
 
     let slider = sap.ui.getCore().byId("tssreg-timeofday-slider");

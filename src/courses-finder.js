@@ -77,44 +77,46 @@
   let searchToken = 0;
   let refreshPending = false;
 
-  sap.ui.require(
-    [
-      "sap/m/Panel",
-      "sap/m/Toolbar",
-      "sap/m/ToolbarSpacer",
-      "sap/m/Text",
-      "sap/m/Label",
-      "sap/m/VBox",
-      "sap/m/HBox",
-      "sap/m/Button",
-      "sap/m/SearchField",
-      "sap/m/Input",
-      "sap/m/Select",
-      "sap/m/ComboBox",
-      "sap/m/MultiComboBox",
-      "sap/m/RangeSlider",
-      "sap/m/Table",
-      "sap/m/Column",
-      "sap/m/ColumnListItem",
-      "sap/m/ObjectStatus",
-      "sap/m/BusyIndicator",
-      "sap/ui/layout/AlignedFlowLayout",
-      "sap/ui/layout/VerticalLayout",
-      "sap/ui/core/HTML",
-      "sap/ui/core/Item",
-    ],
-    function () {
-      const names = [
-        "Panel", "Toolbar", "ToolbarSpacer", "Text", "Label", "VBox", "HBox", "Button",
-        "SearchField", "Input", "Select", "ComboBox", "MultiComboBox", "RangeSlider", "Table", "Column",
-        "ColumnListItem", "ObjectStatus", "BusyIndicator", "AlignedFlowLayout", "VerticalLayout", "HTML", "Item",
-      ];
-      const loaded = {};
-      names.forEach((name, index) => (loaded[name] = arguments[index]));
-      modules = loaded;
-      apply();
-    }
-  );
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(
+      [
+        "sap/m/Panel",
+        "sap/m/Toolbar",
+        "sap/m/ToolbarSpacer",
+        "sap/m/Text",
+        "sap/m/Label",
+        "sap/m/VBox",
+        "sap/m/HBox",
+        "sap/m/Button",
+        "sap/m/SearchField",
+        "sap/m/Input",
+        "sap/m/Select",
+        "sap/m/ComboBox",
+        "sap/m/MultiComboBox",
+        "sap/m/RangeSlider",
+        "sap/m/Table",
+        "sap/m/Column",
+        "sap/m/ColumnListItem",
+        "sap/m/ObjectStatus",
+        "sap/m/BusyIndicator",
+        "sap/ui/layout/AlignedFlowLayout",
+        "sap/ui/layout/VerticalLayout",
+        "sap/ui/core/HTML",
+        "sap/ui/core/Item",
+      ],
+      function () {
+        const names = [
+          "Panel", "Toolbar", "ToolbarSpacer", "Text", "Label", "VBox", "HBox", "Button",
+          "SearchField", "Input", "Select", "ComboBox", "MultiComboBox", "RangeSlider", "Table", "Column",
+          "ColumnListItem", "ObjectStatus", "BusyIndicator", "AlignedFlowLayout", "VerticalLayout", "HTML", "Item",
+        ];
+        const loaded = {};
+        names.forEach((name, index) => (loaded[name] = arguments[index]));
+        modules = loaded;
+        apply();
+      }
+    );
+  });
 
   function text(value, styleClass) {
     const control = new modules.Text({ text: value, wrapping: true });

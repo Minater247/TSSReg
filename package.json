@@ -2,9 +2,12 @@
   "name": "tssreg",
   "version": "0.1.0",
   "private": true,
-  "description": "Chrome/Firefox extension fixing UCSD TSS quirks",
+  "description": "Unofficial rework of to UCSD's TSS to improve the user experience",
   "scripts": {
     "build": "node build.js",
-    "test": "node test/load-order.test.js && node test/courses-page.test.js && node test/calendar-layout.test.js && node test/export.test.js"
-  }
+    "test": "node test/load-order.test.js && node test/courses-page.test.js && node test/courses-detail.test.js && node test/calendar-layout.test.js && node test/export.test.js",
+    "package": "node build.js && ./tools/package.sh",
+    "icons": "./tools/make-icons.sh"
+  },
+  "homepage": "https://github.com/Minater247/TSSReg"
 }

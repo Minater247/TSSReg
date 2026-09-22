@@ -14,6 +14,8 @@
   const OVERVIEW_LAYOUT = ".sapUshellEasyScanLayoutInner";
   let overviewPrimary = null;
   let dashboardObserver = null;
+  const sapWaiters = [];
+  let sapObserver = null;
   let lastInner = null;
   let lastInnerCount = -1;
   let framePending = false;
@@ -52,6 +54,31 @@
     return fetch(url, { headers: { Accept: "application/json" } }).then((r) => (r.ok ? r.json() : null));
   }
 
+  function sapReady() {
+    return !!(window.sap && window.sap.ui && typeof window.sap.ui.require === "function");
+  }
+
+  function flushSapWaiters() {
+    if (!sapReady()) return;
+    if (sapObserver) {
+      sapObserver.disconnect();
+      sapObserver = null;
+    }
+    window.removeEventListener("load", flushSapWaiters);
+    sapWaiters.splice(0, sapWaiters.length).forEach((fn) => fn());
+  }
+
+  function whenSapReady(fn) {
+    if (sapReady()) return void fn();
+    sapWaiters.push(fn);
+    if (sapObserver) return;
+    const bootstrap = document.querySelector("#sap-ui-bootstrap, script[src*='sap-ui-core']");
+    if (bootstrap) bootstrap.addEventListener("load", flushSapWaiters, { once: true });
+    window.addEventListener("load", flushSapWaiters);
+    sapObserver = new MutationObserver(flushSapWaiters);
+    sapObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
   function serviceUrl(path) {
     return SERVICE_ROOT + path;
   }
@@ -85,6 +112,59 @@
       rows.forEach((row) => matched.add(row.ModuleID));
       return matched;
     });
+  }
+
+  function nativeButton(className, variant, text) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    const inner = document.createElement("span");
+    inner.className = "sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText " + variant;
+    const content = document.createElement("span");
+    content.className = "sapMBtnContent";
+    const bdi = document.createElement("bdi");
+    bdi.textContent = text;
+    content.appendChild(bdi);
+    inner.appendChild(content);
+    button.appendChild(inner);
+    return button;
+  }
+
+  function filterFieldItem(id, labelText) {
+    const item = document.createElement("div");
+    item.id = id;
+    const layout = document.createElement("div");
+    layout.className = "sapUiVlt sapuiVlt";
+
+    const labelCell = document.createElement("div");
+    labelCell.className = "sapUiVltCell sapuiVltCell";
+    const label = document.createElement("label");
+    label.className = "sapMLabel sapUiSelectable sapMLabelMaxWidth sapUiMdcFilterBarBaseLabel";
+    label.style.textAlign = "left";
+    const labelInner = document.createElement("div");
+    labelInner.className = "sapMLabelInner";
+    labelInner.style.justifyContent = "flex-start";
+    const wrapper = document.createElement("span");
+    wrapper.className = "sapMLabelTextWrapper";
+    const bdi = document.createElement("bdi");
+    bdi.textContent = labelText;
+    wrapper.appendChild(bdi);
+    const colon = document.createElement("span");
+    colon.className = "sapMLabelColonAndRequired";
+    colon.setAttribute("data-colon", ":");
+    colon.setAttribute("aria-hidden", "true");
+    labelInner.appendChild(wrapper);
+    labelInner.appendChild(colon);
+    label.appendChild(labelInner);
+    labelCell.appendChild(label);
+
+    const cell = document.createElement("div");
+    cell.className = "sapUiVltCell sapuiVltCell";
+
+    layout.appendChild(labelCell);
+    layout.appendChild(cell);
+    item.appendChild(layout);
+    return { item, cell };
   }
 
   function isOverviewRoute() {
@@ -355,11 +435,14 @@
   }
 
   window.__tssregShared = {
+    whenSapReady,
     onScheduleTick,
     onUiUpdated,
     registerModuleFilter,
     setOverviewPrimary,
     overviewPrimaryLinks,
+    nativeButton,
+    filterFieldItem,
     isOverviewRoute,
     cardElement,
     navigate,
@@ -375,13 +458,15 @@
   };
 
   patchNetwork();
-  sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {
-    Rendering.attachUIUpdated(check);
-    window.addEventListener("hashchange", () => {
+  whenSapReady(() => {
+    sap.ui.require(["sap/ui/core/Rendering"], (Rendering) => {
+      Rendering.attachUIUpdated(check);
+      window.addEventListener("hashchange", () => {
+        syncDashboardObserver();
+        check();
+      });
       syncDashboardObserver();
       check();
     });
-    syncDashboardObserver();
-    check();
   });
 })();

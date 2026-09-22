@@ -21,25 +21,10 @@
       return;
     }
 
-    const item = document.createElement("div");
-    item.id = "tssreg-conflict-item";
-    item.innerHTML =
-      '<div class="sapUiVlt sapuiVlt">' +
-      '<div class="sapUiVltCell sapuiVltCell">' +
-      '<label class="sapMLabel sapUiSelectable sapMLabelMaxWidth sapUiMdcFilterBarBaseLabel" style="text-align: left;">' +
-      '<div class="sapMLabelInner" style="justify-content: flex-start;">' +
-      '<span class="sapMLabelTextWrapper"><bdi>Conflicts</bdi></span>' +
-      '<span class="sapMLabelColonAndRequired" data-colon=":" aria-hidden="true"></span>' +
-      "</div>" +
-      "</label>" +
-      "</div>" +
-      '<div class="sapUiVltCell sapuiVltCell">' +
-      '<button type="button" class="sapMBtnBase sapMBtn tssreg-conflict-btn">' +
-      '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnDefault">' +
-      '<span class="sapMBtnContent"><bdi>Hide Conflicts</bdi></span></span>' +
-      "</button>" +
-      "</div>" +
-      "</div>";
+    const { item, cell } = window.__tssregShared.filterFieldItem("tssreg-conflict-item", "Conflicts");
+    cell.appendChild(
+      window.__tssregShared.nativeButton("sapMBtnBase sapMBtn tssreg-conflict-btn", "sapMBtnDefault", "Hide Conflicts")
+    );
     host.appendChild(item);
 
     item.querySelector(".tssreg-conflict-btn").addEventListener("click", () => {

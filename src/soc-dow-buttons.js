@@ -57,14 +57,13 @@
     const row = document.createElement("div");
     row.className = "tssreg-dow-row";
     DAYS.forEach(([code, label, short]) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "sapMBtnBase sapMBtn tssreg-dow-btn";
+      const button = window.__tssregShared.nativeButton(
+        "sapMBtnBase sapMBtn tssreg-dow-btn",
+        "sapMBtnDefault",
+        short
+      );
       button.dataset.day = code;
       button.title = label;
-      button.innerHTML =
-        '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnDefault">' +
-        '<span class="sapMBtnContent"><bdi>' + short + "</bdi></span></span>";
       button.addEventListener("click", () => toggleDay(bar, code));
       row.appendChild(button);
     });

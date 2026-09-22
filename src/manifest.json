@@ -2,7 +2,14 @@
   "manifest_version": 3,
   "name": "TSSReg",
   "version": "0.1.0",
-  "description": "Fixes UCSD Triton Student System quirks.",
+  "description": "Unofficial rework of to UCSD's TSS to improve the user experience",
+  "homepage_url": "https://github.com/Minater247/TSSReg",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "declarativeNetRequest"
   ],
@@ -57,6 +64,7 @@
         "courses-catalog.js",
         "courses-export.js",
         "courses-calendar.js",
+        "courses-detail.js",
         "courses-finder.js"
       ],
       "world": "MAIN",
@@ -75,7 +83,12 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "tssreg@tssreg.local",
-      "strict_min_version": "128.0"
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
     }
   }
 }

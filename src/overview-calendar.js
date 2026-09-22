@@ -24,24 +24,26 @@
   let fetchStarted = false;
   let weekOffset = 0;
 
-  sap.ui.require(
-    [
-      "sap/ui/core/theming/Parameters",
-      "sap/ui/layout/cssgrid/CSSGrid",
-      "sap/m/Text",
-      "sap/m/VBox",
-      "sap/m/HBox",
-      "sap/m/Toolbar",
-      "sap/m/ToolbarSpacer",
-      "sap/m/Button",
-      "sap/m/Title",
-      "sap/m/Link",
-      "sap/ui/core/HTML",
-    ],
-    (Parameters, CSSGrid, Text, VBox, HBox, Toolbar, ToolbarSpacer, Button, Title, Link, HTML) => {
-      modules = { Parameters, CSSGrid, Text, VBox, HBox, Toolbar, ToolbarSpacer, Button, Title, Link, HTML };
-    }
-  );
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(
+      [
+        "sap/ui/core/theming/Parameters",
+        "sap/ui/layout/cssgrid/CSSGrid",
+        "sap/m/Text",
+        "sap/m/VBox",
+        "sap/m/HBox",
+        "sap/m/Toolbar",
+        "sap/m/ToolbarSpacer",
+        "sap/m/Button",
+        "sap/m/Title",
+        "sap/m/Link",
+        "sap/ui/core/HTML",
+      ],
+      (Parameters, CSSGrid, Text, VBox, HBox, Toolbar, ToolbarSpacer, Button, Title, Link, HTML) => {
+        modules = { Parameters, CSSGrid, Text, VBox, HBox, Toolbar, ToolbarSpacer, Button, Title, Link, HTML };
+      }
+    );
+  });
 
   function safeColor(value) {
     return /^#[0-9a-fA-F]{3,8}$/.test(String(value || "")) ? value : "#999999";

@@ -6,7 +6,7 @@
   const TIME_MAX = 1320;
   const UNITS_MIN = 0;
   const UNITS_MAX = 20;
-  const DAY_FROM_DOW = { 1: "MO", 2: "TU", 3: "WE", 4: "TH", 5: "FR", 6: "SA", 7: "SU" };
+  const DAY_FROM_DOW = window.__tssregShared.coursesPage.DAY_FROM_DOW;
   const DAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
   const TYPE_ORDER = { LE: 0, SE: 1, DI: 2, LA: 3, FI: 4 };
 

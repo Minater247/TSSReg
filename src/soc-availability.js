@@ -54,14 +54,13 @@
     const row = document.createElement("div");
     row.className = "tssreg-avail-row";
     MODES.forEach(([code, label]) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "sapMBtnBase sapMBtn tssreg-avail-btn";
+      const button = window.__tssregShared.nativeButton(
+        "sapMBtnBase sapMBtn tssreg-avail-btn",
+        "sapMBtnDefault",
+        label
+      );
       button.dataset.mode = code;
       button.title = label;
-      button.innerHTML =
-        '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnDefault">' +
-        '<span class="sapMBtnContent"><bdi>' + label + "</bdi></span></span>";
       button.addEventListener("click", () => setMode(bar, code));
       row.appendChild(button);
     });

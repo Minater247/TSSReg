@@ -5,10 +5,16 @@
   const SOC_ROUTE = "#YSchedule-view";
   const DAY_NAMES = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const DAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+  const DAY_FROM_DOW = { 1: "MO", 2: "TU", 3: "WE", 4: "TH", 5: "FR", 6: "SA", 7: "SU" };
 
   function isCoursesRoute() {
     const hash = location.hash || "";
     return /\/MyModules$/.test(hash) && hash.indexOf("/Detail/") === -1;
+  }
+
+  function isDetailRoute() {
+    const hash = location.hash || "";
+    return hash.indexOf("#ZUSModule-display") === 0 && hash.indexOf("/Detail/") !== -1;
   }
 
   function pageControl() {
@@ -89,7 +95,9 @@
   window.__tssregShared.coursesPage = {
     DAY_NAMES,
     DAY_ORDER,
+    DAY_FROM_DOW,
     isCoursesRoute,
+    isDetailRoute,
     pageControl,
     listControl,
     mountAfterList,

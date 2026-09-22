@@ -27,13 +27,12 @@
     const adapt = bar.querySelector('[id$="-btnAdapt"]');
     if (!adapt) return null;
 
-    const button = document.createElement("button");
+    const button = window.__tssregShared.nativeButton(
+      "sapMBtnBase sapMBtn",
+      "sapMBtnTransparent",
+      "More Filters"
+    );
     button.id = "tssreg-more-filters";
-    button.type = "button";
-    button.className = "sapMBtnBase sapMBtn";
-    button.innerHTML =
-      '<span class="sapMBtnInner sapMBtnHoverable sapMFocusable sapMBtnText sapMBtnTransparent">' +
-      '<span class="sapMBtnContent"><bdi>More Filters</bdi></span></span>';
     button.addEventListener("click", () => {
       expanded = !expanded;
       applyExpanded(bar, button);

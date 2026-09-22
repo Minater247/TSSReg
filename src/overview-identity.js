@@ -10,8 +10,10 @@
   let modules = null;
   const calmedNavs = new WeakSet();
 
-  sap.ui.require(["sap/m/QuickViewGroupElement"], (QuickViewGroupElement) => {
-    modules = { QuickViewGroupElement };
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(["sap/m/QuickViewGroupElement"], (QuickViewGroupElement) => {
+      modules = { QuickViewGroupElement };
+    });
   });
 
   function courseCount() {

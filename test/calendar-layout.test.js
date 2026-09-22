@@ -35,6 +35,7 @@ function loadCalendar() {
         loadMeetings: () => Promise.resolve({}),
       },
       onUiUpdated() {},
+      whenSapReady: (fn) => fn(),
       odataLiteral: (value) => "'" + String(value).replace(/'/g, "''") + "'",
     },
     addEventListener() {},

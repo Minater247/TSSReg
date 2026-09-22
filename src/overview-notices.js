@@ -15,8 +15,10 @@
   let fetchStarted = false;
   let rendered = null;
 
-  sap.ui.require(["sap/m/VBox", "sap/m/HBox", "sap/m/Text", "sap/m/Link", "sap/ui/core/HTML"], (VBox, HBox, Text, Link, HTML) => {
-    modules = { VBox, HBox, Text, Link, HTML };
+  window.__tssregShared.whenSapReady(() => {
+    sap.ui.require(["sap/m/VBox", "sap/m/HBox", "sap/m/Text", "sap/m/Link", "sap/ui/core/HTML"], (VBox, HBox, Text, Link, HTML) => {
+      modules = { VBox, HBox, Text, Link, HTML };
+    });
   });
 
   function ensureData() {
