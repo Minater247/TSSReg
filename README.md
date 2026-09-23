@@ -4,6 +4,8 @@ An unofficial rework of UC San Diego's Triton Student System.
 
 TSS was poised as a replacement for WebReg, but left a lot behind. TSSReg brings the schedule planner back, gives course search some helpful new filters, and gives the homepage a proper structure.
 
+<b style="font-size: 20px;">New: Also fixes the page on Firefox!</b>
+
 > Not affiliated with, endorsed by, or sponsored by UC San Diego. Works entirely on the client side, does not change any server state.
 
 ![Screenshot](./media/readme-screenshot.png)
