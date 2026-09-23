@@ -18,15 +18,6 @@
   border-bottom: 1px solid var(--tssreg-border);
 }
 
-.tssreg-cal .tssreg-cal-plan {
-  gap: 8px;
-}
-
-.tssreg-cal .tssreg-cal-plan-label.sapMLabel {
-  font-size: 0.8125rem !important;
-  font-weight: 600;
-}
-
 .tssreg-cal .tssreg-cal-plan-select .sapMBtnInner {
   justify-content: space-between;
 }

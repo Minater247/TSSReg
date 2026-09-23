@@ -5,7 +5,7 @@
   "description": "Unofficial rework of UCSD's TSS to improve the user experience",
   "scripts": {
     "build": "node build.js",
-    "test": "node test/load-order.test.js && node test/session-dialog.test.js && node test/courses-page.test.js && node test/courses-detail.test.js && node test/calendar-layout.test.js && node test/export.test.js",
+    "test": "node test/load-order.test.js && node test/session-dialog.test.js && node test/courses-catalog.test.js && node test/courses-page.test.js && node test/courses-detail.test.js && node test/calendar-layout.test.js && node test/export.test.js",
     "package": "npm run lint && node build.js && ./tools/package.sh && npm run validate",
     "icons": "./tools/make-icons.sh",
     "lint": "eslint src/",

@@ -313,29 +313,56 @@
     return fetchEntity("YUCSD_CON_MODULE_SCHED", wanted, schedScope(year, term)).then(meetingsByModule);
   }
 
-  function finalRoomKey(moduleId, date) {
-    return (
-      stripPad(moduleId) +
-      "|" +
-      date.getUTCFullYear() +
-      "-" +
-      String(date.getUTCMonth() + 1).padStart(2, "0") +
-      "-" +
-      String(date.getUTCDate()).padStart(2, "0")
-    );
+  function clockMinutes(text) {
+    const match = /^(\d{1,2}):(\d{2})\s*([AP])M$/i.exec(String(text || "").trim());
+    if (!match) return null;
+    const hour = Number(match[1]) % 12;
+    return (hour + (match[3].toUpperCase() === "P" ? 12 : 0)) * 60 + Number(match[2]);
   }
 
-  function finalRoomsByModule(rows) {
-    const out = {};
+  function finalFromSched(text) {
+    const line = String(text || "")
+      .split("\n")
+      .map((entry) => entry.trim())
+      .filter((entry) => /^Final Examination\b/.test(entry))[0];
+    const dated = line && /^Final Examination\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.*)$/.exec(line);
+    if (!dated) return null;
+    const at = dated[4].indexOf("@");
+    const span = /^(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i.exec(
+      (at === -1 ? dated[4] : dated[4].slice(0, at)).trim()
+    );
+    const startMin = span && clockMinutes(span[1]);
+    const endMin = span && clockMinutes(span[2]);
+    if (startMin == null || endMin == null || endMin <= startMin) return null;
+    return {
+      date: new Date(Date.UTC(+dated[3], +dated[1] - 1, +dated[2])),
+      startMin,
+      endMin,
+      room: at === -1 ? "" : dated[4].slice(at + 1).trim(),
+    };
+  }
+
+  function finalsFromEvents(rows) {
+    const out = [];
+    const seen = {};
     rows.forEach((row) => {
-      String(row.Sched || "")
-        .split("\n")
-        .forEach((line) => {
-          const match = /^Final Examination\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\b[^@]*@\s*(.+)$/.exec(line.trim());
-          if (!match) return;
-          const date = new Date(Date.UTC(+match[3], +match[1] - 1, +match[2]));
-          out[finalRoomKey(row.ModuleID, date)] = match[4].trim();
-        });
+      const final = finalFromSched(row.Sched);
+      if (!final) return;
+      const moduleId = stripPad(row.ModuleID);
+      const pkgId = stripPad(row.EventPkgObjid || row.EventObjid);
+      const key = moduleId + "|" + pkgId;
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({
+        moduleId,
+        pkgId,
+        date: final.date,
+        startMin: final.startMin,
+        endMin: final.endMin,
+        room: final.room,
+        abbr: String(row.EventAbbr || ""),
+        instructor: String(row.InstructorName || ""),
+      });
     });
     return out;
   }
@@ -353,10 +380,10 @@
     });
   }
 
-  function loadFinalRooms(ids, year, term) {
+  function loadFinals(ids, year, term) {
     const wanted = ids.map(stripPad).filter(Boolean);
-    if (!wanted.length) return Promise.resolve({});
-    return fetchEntity("YUCSD_CON_EVENTS", wanted, eventScope(year, term)).then(finalRoomsByModule);
+    if (!wanted.length) return Promise.resolve([]);
+    return fetchEntity("YUCSD_CON_EVENTS", wanted, eventScope(year, term)).then(finalsFromEvents);
   }
 
   function fetchSections(ids, year, term) {
@@ -441,9 +468,10 @@
     loadInstructors,
     loadCreditRange,
     loadMeetings,
-    loadFinalRooms,
+    loadFinals,
+    finalFromSched,
+    finalsFromEvents,
     loadBuildings,
-    finalRoomKey,
     scheduleKey,
     plainId: stripPad,
     search,

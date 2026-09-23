@@ -18,29 +18,27 @@ function evaluate(file, win) {
   );
 }
 
+let currentPlan = null;
+
 function loadCalendar() {
   const src = fs.readFileSync(SRC, "utf8");
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   const exposed =
     body +
-    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, examLabel, eventsByPackage, finalRooms, buildings, finalRoomLabels };";
+    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, eventsByPackage, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage };";
 
   const plain = (value) => String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
   const win = {
     __tssregShared: {
-      plans: { CHANGE_EVENT: "tssreg:plans-changed", current: () => null, signature: () => "[]" },
+      plans: {
+        CHANGE_EVENT: "tssreg:plans-changed",
+        current: () => currentPlan,
+        signature: () => "[]",
+      },
       catalog: {
         plainId: plain,
         scheduleKey: (year, term, moduleId, sectionId) => [plain(year), plain(term), plain(moduleId), plain(sectionId)].join("|"),
         loadMeetings: () => Promise.resolve({}),
-        finalRoomKey: (moduleId, date) =>
-          plain(moduleId) +
-          "|" +
-          date.getUTCFullYear() +
-          "-" +
-          String(date.getUTCMonth() + 1).padStart(2, "0") +
-          "-" +
-          String(date.getUTCDate()).padStart(2, "0"),
       },
       onUiUpdated() {},
       whenSapReady: (fn) => fn(),
@@ -344,108 +342,238 @@ check(
 );
 
 // ---------- final exams ----------
-function meeting(type, typeText, startMin, endMin, date, seqnr) {
-  return {
-    MeetingType: type,
-    MeetingTypeText: typeText,
-    StartTime: { ms: startMin * 60000 },
-    EndTime: { ms: endMin * 60000 },
-    EventDate: date,
-    Seqnr: seqnr || "001",
-  };
-}
-
 cal.buildings["Center Hall"] = "CENTR";
 cal.buildings["Franklin Antonio Hall"] = "FAH";
 
-function finalsFixture(schedule, room) {
-  cal.finalRooms["9462|2026-12-11"] = room;
-  const row = {
-    EventPackageId: "PKG1",
-    SmObjid: "0009462",
-    SmShort: "CSE-123",
-    SmStext: "Computer Networks",
-    SmStatusText: "Booked",
-  };
-  cal.eventsByPackage.PKG1 = [
-    { EventId: "E1", EventStext: "A00", InstrText: "Staff", EventSchedule: { results: schedule } },
-  ];
-  return cal.finalsItems([{ row }]);
+function enrolledRow(fields) {
+  return Object.assign(
+    {
+      EventPackageId: "00154645",
+      SmObjid: "0009462",
+      SmShort: "CSE-123",
+      SmStext: "Computer Networks",
+      SmStatusText: "Booked",
+    },
+    fields
+  );
 }
 
-const examDate = new Date(Date.UTC(2026, 11, 11));
-const withFinal = finalsFixture(
-  [
-    meeting("", "", 1020, 1070, new Date(Date.UTC(2026, 11, 7))),
-    meeting("FI", "Final Examination", 1140, 1379, examDate),
-  ],
-  "Center Hall Room 115"
-);
+function finalRecord(fields) {
+  return Object.assign(
+    {
+      moduleId: "9462",
+      pkgId: "154645",
+      date: new Date(Date.UTC(2026, 11, 11)),
+      startMin: 1140,
+      endMin: 1379,
+      room: "Center Hall Room 115",
+      abbr: "001-000-LE",
+      instructor: "Alex Snoeren",
+    },
+    fields
+  );
+}
 
-check("only the exam meeting is drawn on the finals tab", withFinal.length, 1);
+cal.finalsByPackage["9462|154645"] = finalRecord({});
+const withFinal = cal.finalsItems([{ row: enrolledRow({}) }]);
+
+check("an enrolled course with an exam is drawn once", withFinal.length, 1);
 check(
-  "the exam lands on the weekday of its own date",
+  "the exam lands in the column for its own date",
   [withFinal[0].day, withFinal[0].startMin, withFinal[0].endMin],
-  ["FR", 1140, 1379]
+  ["2026-12-11", 1140, 1379]
 );
-check("the service's wording is shortened to fit a block", withFinal[0].method, "Final Exam");
+check("the block names the session in the space it has", withFinal[0].method, "Final Exam");
 check("a published room keeps its number behind a short building code", withFinal[0].room, "CENTR 115");
 check("the full room keeps the number for the detail", withFinal[0].roomFull, "CENTR - 115");
 check(
-  "each exam gets a key of its own",
-  withFinal[0].key,
-  "final|PKG1|E1|001"
+  "the section and instructor come from the exam itself",
+  [withFinal[0].section, withFinal[0].instructor],
+  ["001-000-LE", "Alex Snoeren"]
 );
+check("each exam gets a key of its own", withFinal[0].key, "final|00154645");
 check("the course status rides along", withFinal[0].status, "enrolled");
+check("the block is marked as an exam so it reads its own detail", withFinal[0].final, true);
 
-// ---------- exam wording ----------
-check("the service's own wording is shortened", cal.examLabel("Final Examination"), "Final Exam");
-check("a missing wording still names the session", cal.examLabel(""), "Final Exam");
-check("wording that is already short is left alone", cal.examLabel("Final Exam"), "Final Exam");
-check("unfamiliar wording is left intact", cal.examLabel("Take-home Assessment"), "Take-home Assessment");
+check(
+  "a course whose exam is not published yet is left out rather than guessed at",
+  cal.finalsItems([{ row: enrolledRow({ EventPackageId: "00159999" }) }]).length,
+  0
+);
+check(
+  "an exam is matched on both its course and its section, not one of them",
+  cal.finalsItems([{ row: enrolledRow({ SmObjid: "0009999" }) }]).length,
+  0
+);
 
 // ---------- exam rooms ----------
-const noRoom = finalsFixture([meeting("FI", "Final Examination", 1140, 1379, examDate)], undefined);
+cal.finalsByPackage["9462|154646"] = finalRecord({ pkgId: "154646", room: "" });
+const noRoom = cal.finalsItems([{ row: enrolledRow({ EventPackageId: "00154646" }) }]);
 check("an unpublished room says so on the block", noRoom[0].room, "Room TBA");
 check("an unpublished room says so in the detail", noRoom[0].roomFull, "Room not posted yet");
+
+// ---------- the finals week ----------
+const midweek = [{ date: new Date(Date.UTC(2026, 11, 9)) }];
+check(
+  "the week runs Saturday to Saturday around a midweek exam",
+  cal.finalsWeek(midweek).map(cal.dateKey),
+  [
+    "2026-12-05",
+    "2026-12-06",
+    "2026-12-07",
+    "2026-12-08",
+    "2026-12-09",
+    "2026-12-10",
+    "2026-12-11",
+    "2026-12-12",
+  ]
+);
+check(
+  "an exam on the opening Saturday does not push the week back a day",
+  cal.finalsWeek([{ date: new Date(Date.UTC(2026, 11, 5)) }]).map(cal.dateKey).slice(0, 1),
+  ["2026-12-05"]
+);
+check(
+  "an exam on the closing Saturday still falls inside the week",
+  cal.finalsWeek([{ date: new Date(Date.UTC(2026, 11, 5)) }, { date: new Date(Date.UTC(2026, 11, 12)) }])
+    .map(cal.dateKey)
+    .slice(-1),
+  ["2026-12-12"]
+);
+check("no exams means no week to draw", cal.finalsWeek([]), []);
+check(
+  "every day of the week is labelled, exam or not",
+  cal.finalsDayDates(midweek),
+  {
+    "2026-12-05": "Sat Dec 5",
+    "2026-12-06": "Sun Dec 6",
+    "2026-12-07": "Mon Dec 7",
+    "2026-12-08": "Tue Dec 8",
+    "2026-12-09": "Wed Dec 9",
+    "2026-12-10": "Thu Dec 10",
+    "2026-12-11": "Fri Dec 11",
+    "2026-12-12": "Sat Dec 12",
+  }
+);
 
 // ---------- room wording ----------
 check(
   "a long building name becomes its campus code",
-  cal.finalRoomLabels("Franklin Antonio Hall Room 1301"),
+  cal.roomLabels("Franklin Antonio Hall Room 1301"),
   { short: "FAH 1301", full: "FAH - 1301" }
 );
 check(
   "a building missing from the directory keeps its full name rather than guessing",
-  cal.finalRoomLabels("Some New Hall Room 12"),
+  cal.roomLabels("Some New Hall Room 12"),
   { short: "Some New Hall 12", full: "Some New Hall - 12" }
 );
 check(
   "room text in an unexpected shape is passed through untouched",
-  cal.finalRoomLabels("Remote"),
+  cal.roomLabels("Remote"),
   { short: "Remote", full: "Remote" }
 );
-check("no room text yields no labels", cal.finalRoomLabels(""), null);
+check("no room text yields no labels", cal.roomLabels(""), null);
 
-// ---------- unusable exam rows ----------
+// ---------- final exams for planned courses ----------
+cal.finalsByPackage["9604|154999"] = {
+  moduleId: "9604",
+  pkgId: "154999",
+  date: new Date(Date.UTC(2026, 11, 10)),
+  startMin: 480,
+  endMin: 659,
+  room: "Franklin Antonio Hall Room 1301",
+  abbr: "001-000-LE",
+  instructor: "Patrick Pannuto",
+};
+
+currentPlan = {
+  sections: [
+    {
+      moduleId: "0009604",
+      pkgId: "154999",
+      year: "2026",
+      term: "2",
+      courseCode: "CSE-141",
+      title: "Computer Architecture",
+      components: [{ abbr: "001-000-LE", type: "Lecture", instructor: "Staff", location: "", meetings: [] }],
+    },
+    {
+      moduleId: "0009999",
+      pkgId: "111111",
+      year: "2026",
+      term: "2",
+      courseCode: "CSE-999",
+      title: "Course With No Final",
+      components: [{ abbr: "001-000-LE", type: "Lecture", instructor: "Staff", location: "", meetings: [] }],
+    },
+  ],
+};
+
+const plannedFinals = cal.plannedFinalsItems();
+check("only planned courses that actually hold a final are drawn", plannedFinals.length, 1);
 check(
-  "an exam with no date is dropped rather than drawn on the wrong day",
-  finalsFixture([meeting("FI", "Final Examination", 1140, 1379, null)], "Center Hall Room 115").length,
-  0
+  "a planned final lands on its own date at its own time",
+  [plannedFinals[0].day, plannedFinals[0].startMin, plannedFinals[0].endMin],
+  ["2026-12-10", 480, 659]
 );
 check(
-  "an exam that ends before it starts is dropped",
-  finalsFixture([meeting("FI", "Final Examination", 1379, 1140, examDate)], "Center Hall Room 115").length,
-  0
+  "a planned final is marked planned so it reads differently from an enrolled one",
+  plannedFinals[0].status,
+  "planned"
+);
+check("a planned final shortens its room like any other", plannedFinals[0].room, "FAH 1301");
+check(
+  "a planned final carries the course it belongs to",
+  [plannedFinals[0].courseCode, plannedFinals[0].section],
+  ["CSE-141", "001-000-LE"]
 );
 check(
-  "a date arriving as an OData string is still placed",
-  finalsFixture(
-    [meeting("FI", "Final Examination", 1140, 1379, "/Date(" + examDate.getTime() + ")/")],
-    "Center Hall Room 115"
-  ).map((item) => item.day),
-  ["FR"]
+  "a planned final names the instructor holding the exam, not the one on the plan",
+  plannedFinals[0].instructor,
+  "Patrick Pannuto"
 );
+check(
+  "an enrolled and a planned exam read from the same record alike",
+  [plannedFinals[0].method, plannedFinals[0].final],
+  ["Final Exam", true]
+);
+check(
+  "a planned final cannot collide with an enrolled one",
+  plannedFinals[0].key,
+  "planfinal|0009604|154999"
+);
+
+currentPlan = null;
+check("with no schedule chosen there are no planned finals", cal.plannedFinalsItems(), []);
+
+// ---------- rooms on planned classes ----------
+currentPlan = {
+  sections: [
+    {
+      moduleId: "0009604",
+      pkgId: "154999",
+      year: "2026",
+      term: "2",
+      courseCode: "CSE-141",
+      title: "Computer Architecture",
+      components: [
+        {
+          abbr: "001-000-LE",
+          type: "Lecture",
+          instructor: "Patrick Pannuto",
+          location: "Franklin Antonio Hall Room 1301",
+          meetings: [{ day: "MO", startMin: 480, endMin: 530 }],
+        },
+      ],
+    },
+  ],
+};
+
+const plannedClass = cal.plannedItems();
+check("a planned class shortens its room like an enrolled one", plannedClass[0].room, "FAH 1301");
+check("the planned room keeps its number for the detail", plannedClass[0].roomFull, "FAH - 1301");
+
+currentPlan = null;
 
 // ---------- replacing the calendar contents ----------
 function stubItem(name) {

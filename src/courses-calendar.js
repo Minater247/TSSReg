@@ -5,7 +5,7 @@
   const FINDER_ID = "tssreg-courses-finder";
   const MODE_SCHEDULE = "schedule";
   const MODE_FINALS = "finals";
-  const FINAL_TYPE = "FI";
+  const DAY_MS = 86400000;
   const HIDDEN_CLASS = "tssreg-native-list-hidden";
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
   const ITEMS_EVENT = "tssreg:schedule-items";
@@ -29,7 +29,7 @@
   let modules = null;
   const eventsByPackage = {};
   const meetingsBySection = {};
-  const finalRooms = {};
+  const finalsByPackage = {};
   const buildings = {};
   const inFlight = [];
   const retired = [];
@@ -115,7 +115,6 @@
       const entry = { epoch: readEpoch };
       inFlight.push(entry);
       entry.handle = model.read(path + "/Event", {
-        urlParameters: { $expand: "EventSchedule" },
         success: (data) => {
           dropRead(entry);
           if (entry.epoch !== readEpoch) return;
@@ -138,28 +137,45 @@
     return catalog.scheduleKey(row.AcademicYear, row.AcademicSession, row.SmObjid, "");
   }
 
+  function planSections() {
+    const plan = plans.current();
+    return plan ? plan.sections.filter((section) => section.year && section.term) : [];
+  }
+
+  function planModuleKey(section) {
+    return catalog.scheduleKey(section.year, section.term, section.moduleId, "");
+  }
+
+  function collect(groups, year, term, moduleId, key) {
+    const id = catalog.plainId(moduleId);
+    if (!id || modulesLoaded[key] || pendingModules[key]) return;
+    const name = year + "|" + term;
+    const group = groups[name] || (groups[name] = { year, term, ids: [], keys: [] });
+    if (group.ids.indexOf(id) === -1) group.ids.push(id);
+    if (group.keys.indexOf(key) === -1) group.keys.push(key);
+  }
+
   function ensureMeetings(entries) {
     const groups = {};
-    entries.forEach(({ row }) => {
-      const id = catalog.plainId(row.SmObjid);
-      const key = moduleKey(row);
-      if (!id || modulesLoaded[key] || pendingModules[key]) return;
-      const term = row.AcademicYear + "|" + row.AcademicSession;
-      const group = groups[term] || (groups[term] = { year: row.AcademicYear, term: row.AcademicSession, ids: [], keys: [] });
-      if (group.ids.indexOf(id) === -1) group.ids.push(id);
-      if (group.keys.indexOf(key) === -1) group.keys.push(key);
-    });
+    entries.forEach(({ row }) =>
+      collect(groups, row.AcademicYear, row.AcademicSession, row.SmObjid, moduleKey(row))
+    );
+    planSections().forEach((section) =>
+      collect(groups, section.year, section.term, section.moduleId, planModuleKey(section))
+    );
     Object.keys(groups).forEach((name) => {
       const group = groups[name];
       group.keys.forEach((key) => (pendingModules[key] = true));
       Promise.all([
         catalog.loadMeetings(group.ids, group.year, group.term).catch(() => ({})),
-        catalog.loadFinalRooms(group.ids, group.year, group.term).catch(() => ({})),
+        catalog.loadFinals(group.ids, group.year, group.term).catch(() => []),
         catalog.loadBuildings(group.year, group.term).catch(() => ({})),
       ])
-        .then(([found, rooms, halls]) => {
+        .then(([found, finals, halls]) => {
           Object.keys(found).forEach((key) => (meetingsBySection[key] = found[key]));
-          Object.keys(rooms).forEach((key) => (finalRooms[key] = rooms[key]));
+          finals.forEach((final) => {
+            finalsByPackage[final.moduleId + "|" + final.pkgId] = final;
+          });
           Object.keys(halls).forEach((key) => (buildings[key] = halls[key]));
           group.keys.forEach((key) => {
             delete pendingModules[key];
@@ -271,19 +287,7 @@
     return items;
   }
 
-  function eventDate(value) {
-    const match = /\/Date\((-?\d+)\)\//.exec(String(value));
-    if (match) return new Date(+match[1]);
-    return value instanceof Date ? value : null;
-  }
-
-  function finalRows(event) {
-    const schedule = event.EventSchedule;
-    const rows = (schedule && schedule.results) || (Array.isArray(schedule) ? schedule : []);
-    return rows.filter((row) => row.MeetingType === FINAL_TYPE);
-  }
-
-  function finalRoomLabels(text) {
+  function roomLabels(text) {
     const raw = String(text || "").trim();
     if (!raw) return null;
     const match = /^(.*?)\s+Room\s+(.+)$/i.exec(raw);
@@ -292,45 +296,37 @@
     return { short: code + " " + match[2].trim(), full: code + " - " + match[2].trim() };
   }
 
-  function examLabel(text) {
-    const label = String(text || "").trim();
-    if (!label) return "Final Exam";
-    return label.replace(/\bExamination\b/, "Exam");
+  function finalItem(final, key, status, courseCode, courseTitle, extra) {
+    const labels = roomLabels(final.room);
+    return Object.assign(
+      {
+        key,
+        day: dateKey(final.date),
+        startMin: final.startMin,
+        endMin: final.endMin,
+        status,
+        date: final.date,
+        courseCode,
+        courseTitle,
+        section: final.abbr,
+        method: "Final Exam",
+        room: labels ? labels.short : "Room TBA",
+        roomFull: labels ? labels.full : "Room not posted yet",
+        instructor: final.instructor,
+        final: true,
+      },
+      extra
+    );
   }
 
   function finalsItems(entries) {
     const items = [];
     entries.forEach(({ row }) => {
-      const events = eventsByPackage[row.EventPackageId];
-      if (!events) return;
-      const status = statusOf(row);
-      events.forEach((event) => {
-        finalRows(event).forEach((meeting) => {
-          const date = eventDate(meeting.EventDate);
-          const day = date && DAY_FROM_DOW[((date.getUTCDay() + 6) % 7) + 1];
-          const startMin = minutesOf(meeting.StartTime);
-          const endMin = minutesOf(meeting.EndTime);
-          if (!day || startMin == null || endMin == null || endMin <= startMin) return;
-          const labels = finalRoomLabels(finalRooms[catalog.finalRoomKey(row.SmObjid, date)]);
-          items.push({
-            key: "final|" + row.EventPackageId + "|" + event.EventId + "|" + meeting.Seqnr,
-            day,
-            startMin,
-            endMin,
-            status,
-            date,
-            courseCode: row.SmShort || "",
-            courseTitle: row.SmStext || "",
-            section: event.EventStext || "",
-            method: examLabel(meeting.MeetingTypeText),
-            room: labels ? labels.short : "Room TBA",
-            roomFull: labels ? labels.full : "Room not posted yet",
-            instructor: event.InstrText || "",
-            event,
-            row,
-          });
-        });
-      });
+      const final = finalsByPackage[catalog.plainId(row.SmObjid) + "|" + catalog.plainId(row.EventPackageId)];
+      if (!final) return;
+      items.push(
+        finalItem(final, "final|" + row.EventPackageId, statusOf(row), row.SmShort || "", row.SmStext || "", { row })
+      );
     });
     return items;
   }
@@ -339,21 +335,35 @@
     return date.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
   }
 
-  function finalsDayDates(items) {
-    const out = {};
-    items.forEach((item) => {
-      out[item.day] = DAY_NAMES[item.day] + " " + monthDay(item.date);
-    });
-    return out;
+  function dateKey(date) {
+    return (
+      date.getUTCFullYear() +
+      "-" +
+      String(date.getUTCMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getUTCDate()).padStart(2, "0")
+    );
   }
 
-  function finalsRangeLabel(items) {
-    const times = items.map((item) => item.date.getTime());
-    const first = new Date(Math.min(...times));
-    const last = new Date(Math.max(...times));
-    const year = last.toLocaleDateString("en-US", { timeZone: "UTC", year: "numeric" });
-    const span = monthDay(first) === monthDay(last) ? monthDay(first) : monthDay(first) + " to " + monthDay(last);
-    return span + ", " + year;
+  function weekdayOf(date) {
+    return DAY_FROM_DOW[((date.getUTCDay() + 6) % 7) + 1];
+  }
+
+  function finalsWeek(items) {
+    if (!items.length) return [];
+    const earliest = new Date(Math.min.apply(null, items.map((item) => item.date.getTime())));
+    const saturday = new Date(earliest.getTime() - ((earliest.getUTCDay() + 1) % 7) * DAY_MS);
+    const week = [];
+    for (let offset = 0; offset <= 7; offset++) week.push(new Date(saturday.getTime() + offset * DAY_MS));
+    return week;
+  }
+
+  function finalsDayDates(items) {
+    const out = {};
+    finalsWeek(items).forEach((date) => {
+      out[dateKey(date)] = DAY_NAMES[weekdayOf(date)] + " " + monthDay(date);
+    });
+    return out;
   }
 
   function dayLabel(day) {
@@ -366,6 +376,7 @@
     const items = [];
     plan.sections.forEach((section) => {
       section.components.forEach((component, index) => {
+        const labels = roomLabels(component.location);
         component.meetings.forEach((meeting) => {
           items.push({
             key: "plan|" + section.moduleId + "|" + section.pkgId + "|" + index,
@@ -377,13 +388,27 @@
             courseTitle: section.title,
             section: component.abbr,
             method: component.type,
-            room: component.location,
-            roomFull: component.location,
+            room: labels ? labels.short : "",
+            roomFull: labels ? labels.full : "",
             instructor: component.instructor,
             planned: { section, component },
           });
         });
       });
+    });
+    return items;
+  }
+
+  function plannedFinalsItems() {
+    const items = [];
+    planSections().forEach((section) => {
+      const final = finalsByPackage[catalog.plainId(section.moduleId) + "|" + catalog.plainId(section.pkgId)];
+      if (!final) return;
+      items.push(
+        finalItem(final, "planfinal|" + section.moduleId + "|" + section.pkgId, "planned", section.courseCode, section.title, {
+          planned: { section, component: section.components[0] || null },
+        })
+      );
     });
     return items;
   }
@@ -506,6 +531,20 @@
     return box;
   }
 
+  function examDateLabel(date) {
+    return date.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" });
+  }
+
+  function finalContent(item) {
+    const content = [];
+    content.push(detailRow("Exam Date", examDateLabel(item.date)));
+    content.push(detailRow("Exam Time", fullRangeLabel(item.startMin, item.endMin)));
+    content.push(detailRow("Location", item.roomFull));
+    content.push(detailRow("Instructor", item.instructor));
+    content.push(detailRow("Status", item.planned ? "Planned" : (item.row && item.row.SmStatusText) || ""));
+    return detailBox(content);
+  }
+
   function plannedContent(item) {
     const section = item.planned.section;
     const component = item.planned.component;
@@ -551,6 +590,7 @@
   }
 
   function detailContent(item) {
+    if (item.final) return finalContent(item);
     return item.planned ? plannedContent(item) : enrolledContent(item);
   }
 
@@ -607,8 +647,25 @@
     return new modules.Toolbar({ content });
   }
 
+  function finalFooter(item) {
+    return new modules.Toolbar({
+      content: [
+        new modules.ToolbarSpacer(),
+        new modules.Button({
+          text: "View in TSS",
+          tooltip: "Open this course on the TSS detail page",
+          press: () => {
+            closePopover();
+            location.hash = detailRoute(item.row);
+          },
+        }),
+      ],
+    });
+  }
+
   function detailFooter(item) {
-    return item.planned ? plannedFooter(item) : enrolledFooter(item);
+    if (item.planned) return plannedFooter(item);
+    return item.final ? finalFooter(item) : enrolledFooter(item);
   }
 
   function closePopover() {
@@ -795,20 +852,15 @@
 
   function planControls() {
     const plan = plans.current();
-    const all = plans.list();
-    const caption = new modules.Label({ text: "My Schedule:" });
-    caption.addStyleClass("tssreg-cal-plan-label");
     const picker = new modules.MenuButton({
       text: plan ? planLabel(plan) : "No schedule yet",
+      tooltip: "Choose a schedule",
       width: "12rem",
       buttonMode: "Regular",
-      menu: planMenu(plan, all),
+      menu: planMenu(plan, plans.list()),
     });
     picker.addStyleClass("tssreg-cal-plan-select");
-    caption.setLabelFor(picker);
-    const box = new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [caption, picker] });
-    box.addStyleClass("tssreg-cal-plan");
-    return box;
+    return picker;
   }
 
   function exportTitle() {
@@ -854,20 +906,11 @@
     return button;
   }
 
-  function finalsCaption(items) {
-    const text = items.length ? "Finals week: " + finalsRangeLabel(items) : "Final exams";
-    const caption = new modules.Label({ text });
-    caption.addStyleClass("tssreg-cal-plan-label");
-    const box = new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [caption] });
-    box.addStyleClass("tssreg-cal-plan");
-    return box;
-  }
-
   function buildChrome(items) {
     const bar = new modules.HBox({ renderType: "Bare", alignItems: "Center", wrap: "Wrap" });
     bar.addStyleClass("tssreg-cal-toolbar");
     bar.addItem(buildTabs());
-    bar.addItem(mode === MODE_FINALS ? finalsCaption(items) : planControls());
+    bar.addItem(planControls());
     bar.addItem(legendControl(items));
     if (items.length) bar.addItem(exportButton());
     return bar;
@@ -881,7 +924,7 @@
 
   function buildCalendar(items) {
     const range = timeRange(items);
-    const days = daysToShow(items);
+    const days = mode === MODE_FINALS ? finalsWeek(items).map(dateKey) : daysToShow(items);
     const placed = [];
     const labels = [];
     const tracks = [];
@@ -1120,13 +1163,15 @@
     if (entries.length) {
       ensureEvents(entries);
       ensureMeetings(entries);
-      const loaded = entries.filter(
-        ({ row }) => eventsByPackage[row.EventPackageId] && modulesLoaded[moduleKey(row)]
-      ).length;
-      if (loaded < entries.length) {
+      const planned = planSections();
+      const total = entries.length + planned.length;
+      const loaded =
+        entries.filter(({ row }) => eventsByPackage[row.EventPackageId] && modulesLoaded[moduleKey(row)]).length +
+        planned.filter((section) => modulesLoaded[planModuleKey(section)]).length;
+      if (loaded < total) {
         setNativeListHidden(list, true);
         publishItems(null);
-        return void showLoading(page, list, loaded, entries.length);
+        return void showLoading(page, list, loaded, total);
       }
     }
     removeLoading();
@@ -1140,7 +1185,7 @@
     }
     setNativeListHidden(list, true);
 
-    const showing = mode === MODE_FINALS ? finalsItems(entries) : scheduled;
+    const showing = mode === MODE_FINALS ? finalsItems(entries).concat(plannedFinalsItems()) : scheduled;
     dayDates = mode === MODE_FINALS && showing.length ? finalsDayDates(showing) : null;
 
     const signature = signatureOf(showing);
