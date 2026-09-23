@@ -185,6 +185,12 @@
   border: 1px dashed #a0a0a0;
 }
 
+.tssreg-cal .tssreg-cal-status-event {
+  background-color: #ffffcc;
+  color: #000000;
+  border: 1px solid #cccc7f;
+}
+
 .tssreg-cal .tssreg-cal-status-other {
   background-color: #eeeeee;
   color: #333333;
@@ -266,7 +272,31 @@
 
 .tssreg-plan-dialog {
   gap: 4px;
-  padding: 4px 0;
+  padding: 1rem;
+}
+
+.tssreg-event-dialog {
+  gap: 12px;
+  padding: 1rem;
+}
+
+.tssreg-event-dialog .tssreg-event-field {
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tssreg-event-dialog .tssreg-event-days {
+  gap: 4px;
+  row-gap: 4px;
+}
+
+.tssreg-event-dialog .tssreg-event-times {
+  gap: 12px;
+}
+
+.tssreg-event-dialog .tssreg-event-problem {
+  margin-bottom: 4px;
 }
 
 .sapMPanel.tssreg-find {

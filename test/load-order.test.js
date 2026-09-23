@@ -136,7 +136,7 @@ check(
   fs.readdirSync(SRC).filter((f) => /\.js$/.test(f) && !scripts.includes(f)),
   ["soc-search-normalize.js", "timezone-fix.js"]
 );
-check("the shared namespaces are all attached", ["catalog", "coursesPage", "plans", "schedule", "scheduleExport"].filter((key) => !shared[key]), []);
+check("the shared namespaces are all attached", ["catalog", "coursesPage", "events", "plans", "schedule", "scheduleExport"].filter((key) => !shared[key]), []);
 check("the page helpers survive load", typeof shared.coursesPage.meetingLabel, "function");
 check("the catalog reuses the shared service root", shared.serviceUrl("X").endsWith("/0001/X"), true);
 check("the export renderer is ready", typeof shared.scheduleExport.download, "function");

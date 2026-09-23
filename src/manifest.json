@@ -61,6 +61,7 @@
         "overview-identity.js",
         "overview-quicklinks.js",
         "courses-plans.js",
+        "courses-events.js",
         "courses-page.js",
         "courses-catalog.js",
         "courses-export.js",

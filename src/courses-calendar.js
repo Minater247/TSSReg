@@ -10,8 +10,18 @@
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
   const ITEMS_EVENT = "tssreg:schedule-items";
   const WEEKDAYS = ["MO", "TU", "WE", "TH", "FR"];
-  const STATUS_LABEL = { enrolled: "Enrolled", waitlisted: "Waitlisted", planned: "Planned", other: "" };
-  const LEGEND_ORDER = ["enrolled", "waitlisted", "planned", "other"];
+  const STATUS_LABEL = { enrolled: "Enrolled", waitlisted: "Waitlisted", planned: "Planned", event: "Event", other: "" };
+  const LEGEND_ORDER = ["enrolled", "waitlisted", "planned", "event", "other"];
+  const DAY_FULL = {
+    MO: "Monday",
+    TU: "Tuesday",
+    WE: "Wednesday",
+    TH: "Thursday",
+    FR: "Friday",
+    SA: "Saturday",
+    SU: "Sunday",
+  };
+  const DAY_SHORT = { MO: "M", TU: "Tu", WE: "W", TH: "Th", FR: "F", SA: "Sa", SU: "Su" };
   const THEME_VARS = [
     ["--tssreg-border", "sapUiListBorderColor", "#e5e5e5"],
     ["--tssreg-line", "sapUiGroupContentBorderColor", "#f0f0f0"],
@@ -21,6 +31,7 @@
   ];
 
   const plans = window.__tssregShared.plans;
+  const events = window.__tssregShared.events;
   const catalog = window.__tssregShared.catalog;
   const coursesPage = window.__tssregShared.coursesPage;
   const { MIN_BLOCK_HEIGHT, BREATHING_ROOM, TRACK_SLACK } = window.__tssregShared.scheduleExport;
@@ -63,13 +74,17 @@
         "sap/m/MenuItem",
         "sap/m/Dialog",
         "sap/m/Input",
+        "sap/m/Select",
+        "sap/ui/core/Item",
+        "sap/m/TimePicker",
+        "sap/m/MessageStrip",
         "sap/m/MessageBox",
         "sap/m/IconTabHeader",
         "sap/m/IconTabFilter",
         "sap/ui/core/HTML",
       ],
-      (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, IconTabHeader, IconTabFilter, HTML) => {
-        modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, MessageBox, IconTabHeader, IconTabFilter, HTML };
+      (Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, Select, Item, TimePicker, MessageStrip, MessageBox, IconTabHeader, IconTabFilter, HTML) => {
+        modules = { Parameters, Text, Label, VBox, HBox, Button, Popover, Toolbar, ToolbarSpacer, ProgressIndicator, MenuButton, Menu, MenuItem, Dialog, Input, Select, Item, TimePicker, MessageStrip, MessageBox, IconTabHeader, IconTabFilter, HTML };
       }
     );
   });
@@ -399,6 +414,35 @@
     return items;
   }
 
+  function currentPlanId() {
+    const plan = plans.current();
+    return plan ? plan.id : null;
+  }
+
+  function eventItems() {
+    const items = [];
+    events.forPlan(currentPlanId()).forEach((record) => {
+      record.days.forEach((day) => {
+        items.push({
+          key: "event|" + record.id,
+          day,
+          startMin: record.startMin,
+          endMin: record.endMin,
+          status: "event",
+          courseCode: record.name,
+          courseTitle: record.name,
+          section: "",
+          method: "",
+          room: record.location,
+          roomFull: record.location,
+          instructor: "",
+          personal: record,
+        });
+      });
+    });
+    return items;
+  }
+
   function plannedFinalsItems() {
     const items = [];
     planSections().forEach((section) => {
@@ -589,7 +633,28 @@
     return detailBox(content);
   }
 
+  function dayNamesLabel(days) {
+    return days.map((day) => DAY_NAMES[day]).join("/");
+  }
+
+  function scopeLabel(planId) {
+    if (!planId) return "Every schedule";
+    const owner = plans.list().filter((plan) => plan.id === planId)[0];
+    return owner ? owner.name + " only" : "This schedule only";
+  }
+
+  function personalContent(item) {
+    const record = item.personal;
+    const content = [];
+    content.push(detailRow("Days", dayNamesLabel(record.days)));
+    content.push(detailRow("Time", fullRangeLabel(item.startMin, item.endMin)));
+    content.push(detailRow("Location", record.location));
+    content.push(detailRow("Applies To", scopeLabel(record.planId)));
+    return detailBox(content);
+  }
+
   function detailContent(item) {
+    if (item.personal) return personalContent(item);
     if (item.final) return finalContent(item);
     return item.planned ? plannedContent(item) : enrolledContent(item);
   }
@@ -663,7 +728,34 @@
     });
   }
 
+  function personalFooter(item) {
+    const record = item.personal;
+    return new modules.Toolbar({
+      content: [
+        new modules.ToolbarSpacer(),
+        new modules.Button({
+          text: "Change",
+          tooltip: "Edit this event",
+          press: () => {
+            closePopover();
+            openEventDialog(record);
+          },
+        }),
+        new modules.Button({
+          text: "Remove",
+          type: "Reject",
+          tooltip: "Delete this event",
+          press: () => {
+            closePopover();
+            confirmRemoveEvent(record);
+          },
+        }),
+      ],
+    });
+  }
+
   function detailFooter(item) {
+    if (item.personal) return personalFooter(item);
     if (item.planned) return plannedFooter(item);
     return item.final ? finalFooter(item) : enrolledFooter(item);
   }
@@ -674,12 +766,17 @@
     openBlockKey = null;
   }
 
+  function popoverTitle(item) {
+    if (item.personal) return item.courseCode;
+    return item.courseTitle + (item.courseCode ? " (" + item.courseCode + ")" : "");
+  }
+
   function openPopover(item, control) {
     const blockKey = item.key + "|" + item.day;
     if (openBlockKey === blockKey) return void closePopover();
     closePopover();
     const popover = new modules.Popover(POPOVER_ID, {
-      title: item.courseTitle + (item.courseCode ? " (" + item.courseCode + ")" : ""),
+      title: popoverTitle(item),
       placement: "Auto",
       contentWidth: "24rem",
       content: [detailContent(item)],
@@ -796,15 +893,183 @@
     dialog.open();
   }
 
+  function ownedEventsNote(plan) {
+    const owned = events.ownedBy(plan.id).length;
+    if (!owned) return "";
+    return " Its " + owned + " event" + (owned === 1 ? "" : "s") + " will go with it.";
+  }
+
   function confirmDelete(plan) {
-    modules.MessageBox.confirm("Delete the schedule \u201c" + plan.name + "\u201d?", {
+    modules.MessageBox.confirm("Delete the schedule \u201c" + plan.name + "\u201d?" + ownedEventsNote(plan), {
       title: "Delete Schedule",
       actions: [modules.MessageBox.Action.DELETE, modules.MessageBox.Action.CANCEL],
       emphasizedAction: modules.MessageBox.Action.DELETE,
       onClose: (action) => {
-        if (action === modules.MessageBox.Action.DELETE) plans.remove(plan);
+        if (action !== modules.MessageBox.Action.DELETE) return;
+        events.removeOwnedBy(plan.id);
+        plans.remove(plan);
       },
     });
+  }
+
+  function clock24(minutes) {
+    return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
+  }
+
+  function pickedMinutes(picker) {
+    const date = picker.getDateValue();
+    return date ? date.getHours() * 60 + date.getMinutes() : null;
+  }
+
+  function timeField(label, minutes) {
+    const picker = new modules.TimePicker({
+      value: minutes == null ? "" : clock24(minutes),
+      valueFormat: "HH:mm",
+      displayFormat: "h:mm a",
+      minutesStep: 5,
+      support2400: false,
+      width: "100%",
+    });
+    const field = new modules.VBox({
+      renderType: "Bare",
+      items: [new modules.Label({ text: label, labelFor: picker }), picker],
+    });
+    field.addStyleClass("tssreg-event-field");
+    return { picker, field };
+  }
+
+  function textField(label, value, limit, placeholder) {
+    const input = new modules.Input({ value, maxLength: limit, placeholder: placeholder || "", width: "100%" });
+    const field = new modules.VBox({
+      renderType: "Bare",
+      items: [new modules.Label({ text: label, labelFor: input }), input],
+    });
+    field.addStyleClass("tssreg-event-field");
+    return { input, field };
+  }
+
+  function scopeOptions() {
+    const plan = plans.current();
+    const options = [{ key: "", text: "Every schedule" }];
+    if (plan) options.push({ key: plan.id, text: plan.name + " only" });
+    return options;
+  }
+
+  function scopeField(record) {
+    const options = scopeOptions();
+    const owned = record && record.planId;
+    const select = new modules.Select({
+      width: "100%",
+      items: options.map((option) => new modules.Item({ key: option.key, text: option.text })),
+      selectedKey: options.some((option) => option.key === owned) ? owned : "",
+    });
+    const field = new modules.VBox({
+      renderType: "Bare",
+      items: [new modules.Label({ text: "Applies To", labelFor: select }), select],
+    });
+    field.addStyleClass("tssreg-event-field");
+    return { select, field };
+  }
+
+  function dayToggles(selected) {
+    const row = new modules.HBox({ renderType: "Bare", wrap: "Wrap" });
+    row.addStyleClass("tssreg-event-days");
+    const toggles = DAY_ORDER.map((day) => {
+      const entry = { day, on: selected.indexOf(day) !== -1 };
+      const markPressed = () => {
+        const dom = entry.button.getDomRef();
+        if (dom) dom.setAttribute("aria-pressed", String(entry.on));
+      };
+      entry.button = new modules.Button({
+        text: DAY_SHORT[day],
+        tooltip: DAY_FULL[day],
+        type: entry.on ? "Emphasized" : "Default",
+        press: () => {
+          entry.on = !entry.on;
+          entry.button.setType(entry.on ? "Emphasized" : "Default");
+          markPressed();
+        },
+      });
+      entry.button.addEventDelegate({ onAfterRendering: markPressed });
+      row.addItem(entry.button);
+      return entry;
+    });
+    const field = new modules.VBox({ renderType: "Bare", items: [new modules.Label({ text: "Days" }), row] });
+    field.addStyleClass("tssreg-event-field");
+    return { toggles, field };
+  }
+
+  function openEventDialog(record) {
+    const name = textField("Event Name", record ? record.name : "", events.NAME_MAX);
+    const location = textField("Location", record ? record.location : "", events.LOCATION_MAX, "Optional");
+    const days = dayToggles(record ? record.days : []);
+    const scope = scopeField(record);
+    const starts = timeField("Starts", record ? record.startMin : null);
+    const ends = timeField("Ends", record ? record.endMin : null);
+
+    const problem = new modules.MessageStrip({ type: "Error", showIcon: true, visible: false });
+    problem.addStyleClass("tssreg-event-problem");
+
+    const times = new modules.HBox({ renderType: "Bare", items: [starts.field, ends.field] });
+    times.addStyleClass("tssreg-event-times");
+
+    const draft = () => ({
+      name: name.input.getValue(),
+      location: location.input.getValue(),
+      days: days.toggles.filter((entry) => entry.on).map((entry) => entry.day),
+      startMin: pickedMinutes(starts.picker),
+      endMin: pickedMinutes(ends.picker),
+      planId: scope.select.getSelectedKey() || null,
+    });
+
+    const submit = () => {
+      const values = draft();
+      const failure = record ? events.update(record.id, values) : events.add(values);
+      if (failure) {
+        problem.setText(failure);
+        problem.setVisible(true);
+        return;
+      }
+      dialog.close();
+    };
+
+    const dialog = new modules.Dialog({
+      title: record ? "Edit Event" : "Add Event",
+      contentWidth: "24rem",
+      content: [
+        new modules.VBox({
+          renderType: "Bare",
+          items: [problem, name.field, location.field, days.field, times, scope.field],
+        }).addStyleClass("tssreg-event-dialog"),
+      ],
+      beginButton: new modules.Button({ text: record ? "Save" : "Add", type: "Emphasized", press: submit }),
+      endButton: new modules.Button({ text: "Cancel", press: () => dialog.close() }),
+      afterClose: () => dialog.destroy(),
+    });
+    name.input.attachSubmit(submit);
+    dialog.open();
+  }
+
+  function confirmRemoveEvent(record) {
+    modules.MessageBox.confirm("Remove the event \u201c" + record.name + "\u201d?", {
+      title: "Remove Event",
+      actions: [modules.MessageBox.Action.DELETE, modules.MessageBox.Action.CANCEL],
+      emphasizedAction: modules.MessageBox.Action.DELETE,
+      onClose: (action) => {
+        if (action === modules.MessageBox.Action.DELETE) events.remove(record.id);
+      },
+    });
+  }
+
+  function addEventButton() {
+    const button = new modules.Button({
+      text: "Add Event",
+      icon: "sap-icon://add",
+      tooltip: "Block out a weekly commitment such as work or a workout",
+      press: () => openEventDialog(null),
+    });
+    button.addStyleClass("tssreg-cal-add-event");
+    return button;
   }
 
   function planLabel(plan) {
@@ -833,7 +1098,11 @@
         new modules.MenuItem({
           text: "Duplicate",
           icon: "sap-icon://copy",
-          press: () => promptFor("Duplicate Schedule", "Name", plan.name + " copy", "Duplicate", (name) => plans.duplicate(plan, name)),
+          press: () =>
+            promptFor("Duplicate Schedule", "Name", plan.name + " copy", "Duplicate", (name) => {
+              const copy = plans.duplicate(plan, name);
+              if (copy) events.copyOwnedBy(plan.id, copy.id);
+            }),
         }),
         new modules.MenuItem({
           text: "Rename",
@@ -911,6 +1180,7 @@
     bar.addStyleClass("tssreg-cal-toolbar");
     bar.addItem(buildTabs());
     bar.addItem(planControls());
+    if (mode === MODE_SCHEDULE) bar.addItem(addEventButton());
     bar.addItem(legendControl(items));
     if (items.length) bar.addItem(exportButton());
     return bar;
@@ -1046,6 +1316,7 @@
     return JSON.stringify([
       mode,
       plans.signature(),
+      events.signature(),
       items.map((item) => [
         item.key,
         item.day,
@@ -1160,29 +1431,22 @@
     const entries = moduleEntries(list);
     if (!entries) return void publishItems(null);
 
-    if (entries.length) {
-      ensureEvents(entries);
-      ensureMeetings(entries);
-      const planned = planSections();
-      const total = entries.length + planned.length;
-      const loaded =
-        entries.filter(({ row }) => eventsByPackage[row.EventPackageId] && modulesLoaded[moduleKey(row)]).length +
-        planned.filter((section) => modulesLoaded[planModuleKey(section)]).length;
-      if (loaded < total) {
-        setNativeListHidden(list, true);
-        publishItems(null);
-        return void showLoading(page, list, loaded, total);
-      }
+    ensureEvents(entries);
+    ensureMeetings(entries);
+    const planned = planSections();
+    const total = entries.length + planned.length;
+    const loaded =
+      entries.filter(({ row }) => eventsByPackage[row.EventPackageId] && modulesLoaded[moduleKey(row)]).length +
+      planned.filter((section) => modulesLoaded[planModuleKey(section)]).length;
+    if (loaded < total) {
+      setNativeListHidden(list, true);
+      publishItems(null);
+      return void showLoading(page, list, loaded, total);
     }
     removeLoading();
 
-    const scheduled = scheduleItems(entries).concat(plannedItems());
+    const scheduled = scheduleItems(entries).concat(plannedItems()).concat(eventItems());
     publishItems(scheduled);
-    if (!scheduled.length) {
-      setNativeListHidden(list, false);
-      destroyCalendar();
-      return;
-    }
     setNativeListHidden(list, true);
 
     const showing = mode === MODE_FINALS ? finalsItems(entries).concat(plannedFinalsItems()) : scheduled;
@@ -1192,7 +1456,7 @@
     const root = calendarRoot();
     if (signature !== rendered || !root.getItems().length) {
       closePopover();
-      swapContent(root, showing.length ? buildCalendar(showing) : buildEmpty());
+      swapContent(root, showing.length || mode === MODE_SCHEDULE ? buildCalendar(showing) : buildEmpty());
       rendered = signature;
     }
     coursesPage.mountAfterList(page, list, root, FINDER_ID);
@@ -1202,6 +1466,7 @@
 
   window.__tssregShared.onUiUpdated(apply);
   window.addEventListener(plans.CHANGE_EVENT, apply);
+  window.addEventListener(events.CHANGE_EVENT, apply);
   window.addEventListener("hashchange", () => {
     if (!isCoursesRoute()) abortReads();
   });

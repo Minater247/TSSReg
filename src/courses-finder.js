@@ -359,7 +359,7 @@
         new modules.ObjectStatus({
           text: "Conflicts",
           state: "Warning",
-          tooltip: "Overlaps an enrolled or planned class",
+          tooltip: "Overlaps something already on your schedule",
         })
       );
       if (state.f.conflictMode === "collapse") {
@@ -577,7 +577,7 @@
     });
     toggle.addStyleClass("tssreg-find-pill");
     const conflicts = fieldWith(
-      captionLabel("Conflicts", "Overlaps an enrolled or planned class"),
+      captionLabel("Conflicts", "Overlaps something already on your schedule"),
       toggle
     );
     days.setWidth("auto");

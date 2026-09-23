@@ -4,6 +4,7 @@ const path = require("path");
 const SRC = path.join(__dirname, "..", "src", "courses-calendar.js");
 const PAGE_SRC = path.join(__dirname, "..", "src", "courses-page.js");
 const EXPORT_SRC = path.join(__dirname, "..", "src", "courses-export.js");
+const EVENTS_SRC = path.join(__dirname, "..", "src", "courses-events.js");
 
 function evaluate(file, win) {
   const src = fs.readFileSync(file, "utf8");
@@ -19,13 +20,14 @@ function evaluate(file, win) {
 }
 
 let currentPlan = null;
+let allPlans = [];
 
 function loadCalendar() {
   const src = fs.readFileSync(SRC, "utf8");
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   const exposed =
     body +
-    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, eventsByPackage, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage };";
+    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, eventsByPackage, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel };";
 
   const plain = (value) => String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
   const win = {
@@ -33,6 +35,7 @@ function loadCalendar() {
       plans: {
         CHANGE_EVENT: "tssreg:plans-changed",
         current: () => currentPlan,
+        list: () => allPlans,
         signature: () => "[]",
       },
       catalog: {
@@ -46,9 +49,11 @@ function loadCalendar() {
     },
     addEventListener() {},
     dispatchEvent() {},
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   };
   evaluate(PAGE_SRC, win);
   evaluate(EXPORT_SRC, win);
+  evaluate(EVENTS_SRC, win);
   const sap = { ui: { require() {}, getCore: () => ({ byId: () => null }) } };
   const doc = { querySelector: () => null };
   const CustomEvent = function (type) {
@@ -625,6 +630,130 @@ check(
   root.getItems().map((item) => item.name),
   ["chrome2", "body2"]
 );
+
+// ---------- weekly events on the calendar ----------
+cal.events.add({ name: "Work", location: "Geisel", days: ["MO", "WE", "FR"], startMin: 900, endMin: 1080 });
+
+check(
+  "an event draws one block on each of its days",
+  cal.eventItems().map((item) => [item.day, item.startMin, item.endMin]),
+  [
+    ["MO", 900, 1080],
+    ["WE", 900, 1080],
+    ["FR", 900, 1080],
+  ]
+);
+check(
+  "an event block carries its name and location",
+  cal.eventItems().map((item) => [item.courseCode, item.room, item.method, item.status]),
+  [
+    ["Work", "Geisel", "", "event"],
+    ["Work", "Geisel", "", "event"],
+    ["Work", "Geisel", "", "event"],
+  ]
+);
+check(
+  "every block of one event shares a key so they open the same detail",
+  new Set(cal.eventItems().map((item) => item.key)).size,
+  1
+);
+
+cal.events.add({ name: "Gym", days: ["TU"], startMin: 420, endMin: 480 });
+check(
+  "a second event adds its own blocks",
+  cal.eventItems().filter((item) => item.day === "TU").map((item) => item.courseCode),
+  ["Gym"]
+);
+check(
+  "an event with no location shows none",
+  cal.eventItems().filter((item) => item.courseCode === "Gym").map((item) => item.room),
+  [""]
+);
+
+check(
+  "an event shares a day track with a class it overlaps",
+  layoutOf([
+    { key: "class", day: "MO", startMin: 960, endMin: 1020 },
+    cal.eventItems().filter((item) => item.day === "MO")[0],
+  ]).map((entry) => [entry.col, entry.cols, entry.conflict]),
+  [
+    [0, 2, true],
+    [1, 2, true],
+  ]
+);
+
+cal.publishItems(cal.eventItems().filter((item) => item.day === "TU"));
+check("an event counts as busy time when searching for classes", cal.busyIntervals(), {
+  TU: [{ startMin: 420, endMin: 480, pkgId: null }],
+});
+
+check(
+  "the legend names events alongside classes",
+  cal.legendModel([{ status: "enrolled" }, { status: "event" }]),
+  [
+    { status: "enrolled", label: "Enrolled" },
+    { status: "event", label: "Event" },
+  ]
+);
+
+// ---------- events that belong to one schedule ----------
+cal.events.list().slice().forEach((record) => cal.events.remove(record.id));
+cal.events.add({ name: "Everywhere", days: ["MO"], startMin: 600, endMin: 660 });
+cal.events.add({ name: "Plan A only", days: ["MO"], startMin: 700, endMin: 760, planId: "planA" });
+
+currentPlan = { id: "planA", name: "Schedule A", sections: [] };
+check(
+  "the calendar shows the global events and the current schedule's own",
+  cal.eventItems().map((item) => item.courseCode),
+  ["Everywhere", "Plan A only"]
+);
+
+currentPlan = { id: "planB", name: "Schedule B", sections: [] };
+check(
+  "switching schedules drops the other schedule's events",
+  cal.eventItems().map((item) => item.courseCode),
+  ["Everywhere"]
+);
+
+currentPlan = null;
+check(
+  "with no schedule at all only the global events draw",
+  cal.eventItems().map((item) => item.courseCode),
+  ["Everywhere"]
+);
+
+// ---------- choosing what an event applies to ----------
+allPlans = [];
+for (let n = 1; n <= 50; n++) allPlans.push({ id: "p" + n, name: "Schedule " + n, sections: [] });
+currentPlan = allPlans[7];
+
+check(
+  "the choice is between every schedule and the one in front of you",
+  cal.scopeOptions(),
+  [
+    { key: "", text: "Every schedule" },
+    { key: "p8", text: "Schedule 8 only" },
+  ]
+);
+
+currentPlan = null;
+check(
+  "with no schedule there is nothing to narrow to",
+  cal.scopeOptions(),
+  [{ key: "", text: "Every schedule" }]
+);
+
+currentPlan = allPlans[7];
+check(
+  "the detail names the schedule an event is tied to",
+  [cal.scopeLabel(null), cal.scopeLabel("p8"), cal.scopeLabel("p50")],
+  ["Every schedule", "Schedule 8 only", "Schedule 50 only"]
+);
+
+allPlans = [];
+currentPlan = null;
+cal.events.list().slice().forEach((record) => cal.events.remove(record.id));
+check("removing every event clears the calendar of them", cal.eventItems(), []);
 
 console.log(passed + " passed, " + failures.length + " failed");
 failures.forEach((line) => console.log("  FAIL " + line));
