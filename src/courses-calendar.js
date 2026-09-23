@@ -303,12 +303,10 @@
   }
 
   function roomLabels(text) {
-    const raw = String(text || "").trim();
-    if (!raw) return null;
-    const match = /^(.*?)\s+Room\s+(.+)$/i.exec(raw);
-    if (!match) return { short: raw, full: raw };
-    const code = buildings[match[1].trim()] || match[1].trim();
-    return { short: code + " " + match[2].trim(), full: code + " - " + match[2].trim() };
+    const parts = catalog.roomParts(text, buildings);
+    if (!parts) return null;
+    if (!parts.number) return { short: parts.code, full: parts.code };
+    return { short: parts.code + " " + parts.number, full: parts.code + " - " + parts.number };
   }
 
   function finalItem(final, key, status, courseCode, courseTitle, extra) {

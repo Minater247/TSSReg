@@ -64,6 +64,7 @@
         "courses-events.js",
         "courses-page.js",
         "courses-catalog.js",
+        "soc-rooms.js",
         "courses-export.js",
         "courses-calendar.js",
         "courses-detail.js",

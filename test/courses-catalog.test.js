@@ -162,6 +162,31 @@ check(
   ["200001"]
 );
 
+// ---------- building names in room text ----------
+const halls = { "Computer Science and Engineering Buildin": "EBU3B", "Center Hall": "CENTR" };
+
+check(
+  "a building name TSS cut off mid-word still resolves to its code",
+  catalog.roomParts("Computer Science and Engineering Buildin Room B270", halls),
+  { code: "EBU3B", number: "B270", coded: true }
+);
+check(
+  "a building missing from the directory keeps its name and says so",
+  catalog.roomParts("Somewhere New Room 12", halls),
+  { code: "Somewhere New", number: "12", coded: false }
+);
+check(
+  "room text in an unexpected shape is passed through whole",
+  catalog.roomParts("Remote", halls),
+  { code: "Remote", number: "", coded: false }
+);
+check("no room text yields no parts", catalog.roomParts("", halls), null);
+check(
+  "a missing directory leaves every name alone",
+  catalog.roomParts("Center Hall Room 105", null),
+  { code: "Center Hall", number: "105", coded: false }
+);
+
 console.log(passed + " passed, " + failures.length + " failed");
 failures.forEach((line) => console.log("  FAIL " + line));
 process.exit(failures.length ? 1 : 0);

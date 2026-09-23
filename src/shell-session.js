@@ -4,17 +4,12 @@
   const FRAME_ID = "SAMLDialogFrame";
   const MESSAGE_ID = "tssreg-session-message";
   const RELOAD_ID = "tssreg-session-reload";
+  const PADDING_CLASS = "sapUiContentPadding";
   const TITLE = "Session Expired";
   const MESSAGE =
     "Your TSS session has expired and could not be renewed in place. Reload the page to sign in again.";
 
   let modules = null;
-
-  shared.whenSapReady(() => {
-    sap.ui.require(["sap/m/Text", "sap/m/Button"], (Text, Button) => {
-      modules = { Text, Button };
-    });
-  });
 
   function framed(dialog) {
     return dialog.getContent().some((control) => control.getId() === FRAME_ID);
@@ -42,8 +37,15 @@
     dialog.setContentHeight(null);
     dialog.setState("Warning");
     dialog.setTitle(TITLE);
+    dialog.addStyleClass(PADDING_CLASS);
     addReload(dialog);
   }
+
+  shared.whenSapReady(() => {
+    sap.ui.require(["sap/m/Text", "sap/m/Button"], (Text, Button) => {
+      modules = { Text, Button };
+    });
+  });
 
   shared.onUiUpdated(apply);
 })();

@@ -25,9 +25,6 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Build and package
-        run: npm run package
-
       - name: Check manifest version is unreleased
         run: |
           version="$(node -p "require('./src/manifest.json').version")"
@@ -37,8 +34,14 @@ jobs:
           fi
           echo "v$version is unreleased"
 
+      - name: Build
+        run: npm run build
+
+      - name: Validate
+        run: npm run validate
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: tssreg
-          path: build/
+          path: dist/

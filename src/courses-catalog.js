@@ -52,6 +52,16 @@
     return match ? match[1].trim() : "";
   }
 
+  function roomParts(text, buildings) {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+    const match = /^(.*?)\s+Room\s+(.+)$/i.exec(raw);
+    if (!match) return { code: raw, number: "", coded: false };
+    const name = match[1].trim();
+    const code = buildings && buildings[name];
+    return { code: code || name, number: match[2].trim(), coded: !!code };
+  }
+
   function packageLabel(text) {
     const match = /\(([^)]+)\)\s*$/.exec(String(text || ""));
     return match ? match[1] : "";
@@ -472,6 +482,7 @@
     finalFromSched,
     finalsFromEvents,
     loadBuildings,
+    roomParts,
     scheduleKey,
     plainId: stripPad,
     search,

@@ -5,6 +5,7 @@ const SRC = path.join(__dirname, "..", "src", "courses-calendar.js");
 const PAGE_SRC = path.join(__dirname, "..", "src", "courses-page.js");
 const EXPORT_SRC = path.join(__dirname, "..", "src", "courses-export.js");
 const EVENTS_SRC = path.join(__dirname, "..", "src", "courses-events.js");
+const CATALOG_SRC = path.join(__dirname, "..", "src", "courses-catalog.js");
 
 function evaluate(file, win) {
   const src = fs.readFileSync(file, "utf8");
@@ -38,20 +39,27 @@ function loadCalendar() {
         list: () => allPlans,
         signature: () => "[]",
       },
-      catalog: {
-        plainId: plain,
-        scheduleKey: (year, term, moduleId, sectionId) => [plain(year), plain(term), plain(moduleId), plain(sectionId)].join("|"),
-        loadMeetings: () => Promise.resolve({}),
-      },
       onUiUpdated() {},
       whenSapReady: (fn) => fn(),
       odataLiteral: (value) => "'" + String(value).replace(/'/g, "''") + "'",
+      chunk: (arr) => [arr],
+      serviceUrl: (name) => "/svc/" + name,
+      CLIENT: "sap-client=500",
+      ROW_LIMIT: 5000,
+      ID_CHUNK_SIZE: 40,
     },
     addEventListener() {},
     dispatchEvent() {},
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   };
   evaluate(PAGE_SRC, win);
+  evaluate(CATALOG_SRC, win);
+  Object.assign(win.__tssregShared.catalog, {
+    plainId: plain,
+    scheduleKey: (year, term, moduleId, sectionId) =>
+      [plain(year), plain(term), plain(moduleId), plain(sectionId)].join("|"),
+    loadMeetings: () => Promise.resolve({}),
+  });
   evaluate(EXPORT_SRC, win);
   evaluate(EVENTS_SRC, win);
   const sap = { ui: { require() {}, getCore: () => ({ byId: () => null }) } };

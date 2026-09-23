@@ -50,6 +50,7 @@ function harness() {
       valueState: "None",
       width: "600px",
       height: "400px",
+      classes: [],
     };
     return register(
       "SAMLDialog",
@@ -70,6 +71,9 @@ function harness() {
         setState: (value) => (state.valueState = value),
         setContentWidth: (value) => (state.width = value),
         setContentHeight: (value) => (state.height = value),
+        addStyleClass: (name) => {
+          if (!state.classes.includes(name)) state.classes.push(name);
+        },
       })
     );
   }
@@ -122,6 +126,11 @@ check(
   samlDialog.state.buttons.map((item) => item.text),
   ["Reload", "Close"]
 );
+check(
+  "the explanation is not flush against the dialog edge",
+  samlDialog.state.classes,
+  ["sapUiContentPadding"]
+);
 
 blocked.registry["tssreg-session-reload"].press();
 check("pressing reload reloads the page", blocked.reloads.length, 1);
@@ -139,6 +148,7 @@ check(
   samlDialog.state.content.map((item) => item.getId()),
   ["tssreg-session-message"]
 );
+check("later render cycles do not stack up padding", samlDialog.state.classes, ["sapUiContentPadding"]);
 
 // ---------- a re-auth dialog that comes back ----------
 const reopened = harness();
