@@ -34,6 +34,10 @@ These are deleted when you clear the site's data.
 - **Host access to `https://tss.ucsd.edu`** is what lets the extension modify TSS pages and read the TSS APIs on your behalf.
 - **`declarativeNetRequestWithHostAccess`** allows `https://tss.ucsd.edu` to redirect to `https://tss.ucsd.edu/fiori`. It reads no request contents and applies to no other URL.
 
+## Chrome Web Store Limited Use
+
+TSSReg uses student data only to provide its features on TSS. TSSReg’s use of this data adheres to the Chrome Web Store User Data Policy, including its [Limited Use requirements](https://developer.chrome.com/docs/webstore/program-policies/limited-use).
+
 ## Contact
 
 Questions or concerns: <https://github.com/Minater247/TSSReg/issues>
