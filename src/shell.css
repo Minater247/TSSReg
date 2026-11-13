@@ -2,6 +2,18 @@
   transform: translateY(5.5%);
 }
 
+/* SAP takes the iframe container out of flow. The replacement message sets
+   the dialog height once the container participates in normal layout. */
+#SAMLDialog:has(#tssreg-session-message) #SAMLDialog-scrollCont {
+  position: static;
+}
+
+#tssreg-session-message {
+  display: block;
+  padding-block: .25rem;
+  line-height: 1.45;
+}
+
 #tssreg-shell-navigation {
   --nav-bg: var(--sapGroup_ContentBackground, #fff);
   --nav-border: var(--sapList_BorderColor, #d9d9d9);

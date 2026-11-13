@@ -21,6 +21,18 @@ function harness() {
   const registry = {};
   const reloads = [];
   const location = { reload: () => reloads.push(1) };
+  const staticArea = {};
+  let popupObserver;
+
+  class MutationObserver {
+    constructor(callback) {
+      this.callback = callback;
+    }
+
+    observe(target, options) {
+      if (target === staticArea) popupObserver = { callback: this.callback, options };
+    }
+  }
 
   function register(id, instance) {
     registry[id] = instance;
@@ -38,11 +50,11 @@ function harness() {
   const sap = {
     ui: {
       require: (names, cb) => cb(Text, Button),
-      getCore: () => ({ byId: (id) => registry[id] || null }),
+      getCore: () => ({ byId: (id) => registry[id] || null, getStaticAreaRef: () => staticArea }),
     },
   };
 
-  function dialog(contentIds) {
+  function dialog(contentIds, hidden = false) {
     const state = {
       content: contentIds.map((id) => register(id, control(id))),
       buttons: [register("SAMLDialogClose", control("SAMLDialogClose", { text: "Close" }))],
@@ -51,11 +63,16 @@ function harness() {
       width: "600px",
       height: "400px",
       classes: [],
+      hidden,
+      horizontalScrolling: true,
+      verticalScrolling: true,
     };
     return register(
       "SAMLDialog",
       control("SAMLDialog", {
         state,
+        isOpen: () => true,
+        hasStyleClass: (name) => name === "sapUshellSamlDialogHidden" && state.hidden,
         getContent: () => state.content,
         getButtons: () => state.buttons,
         destroyContent: () => {
@@ -71,6 +88,8 @@ function harness() {
         setState: (value) => (state.valueState = value),
         setContentWidth: (value) => (state.width = value),
         setContentHeight: (value) => (state.height = value),
+        setHorizontalScrolling: (value) => (state.horizontalScrolling = value),
+        setVerticalScrolling: (value) => (state.verticalScrolling = value),
         addStyleClass: (name) => {
           if (!state.classes.includes(name)) state.classes.push(name);
         },
@@ -78,22 +97,22 @@ function harness() {
     );
   }
 
-  const callbacks = [];
   const win = {
     __tssregShared: {
       whenSapReady: (fn) => fn(),
-      onUiUpdated: (fn) => callbacks.push(fn),
     },
   };
   const src = fs.readFileSync(path.join(SRC, "shell-session.js"), "utf8");
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
-  new Function("window", "sap", "document", "location", body)(win, sap, null, location);
+  new Function("window", "sap", "MutationObserver", "location", body)(win, sap, MutationObserver, location);
 
   return {
     registry,
     reloads,
     dialog,
-    tick: () => callbacks.forEach((fn) => fn()),
+    tick: (type = "childList") => {
+      if (popupObserver?.options[type]) popupObserver.callback([{ type }]);
+    },
   };
 }
 
@@ -119,8 +138,9 @@ check("the dialog is marked as a warning", samlDialog.state.valueState, "Warning
 check(
   "the dialog no longer holds the size the frame needed",
   [samlDialog.state.width, samlDialog.state.height],
-  [null, null]
+  ["28rem", "auto"]
 );
+check("the replacement message does not scroll", [samlDialog.state.horizontalScrolling, samlDialog.state.verticalScrolling], [false, false]);
 check(
   "a reload button leads the dialog's own close button",
   samlDialog.state.buttons.map((item) => item.text),
@@ -149,6 +169,16 @@ check(
   ["tssreg-session-message"]
 );
 check("later render cycles do not stack up padding", samlDialog.state.classes, ["sapUiContentPadding"]);
+
+// ---------- SAP renders a hidden frame for silent renewal, then reveals it ----------
+const pending = harness();
+const hidden = pending.dialog(["SAMLDialogFrame"], true);
+const pendingFrame = pending.registry.SAMLDialogFrame;
+pending.tick();
+check("the hidden frame stays available for silent reauthentication", pendingFrame.destroyed, false);
+hidden.state.hidden = false;
+pending.tick("attributes");
+check("revealing the frame alone shows the expiry message", hidden.state.title, "Session Expired");
 
 // ---------- a re-auth dialog that comes back ----------
 const reopened = harness();
