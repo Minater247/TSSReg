@@ -15,9 +15,8 @@ Fields include:
 - Enrollment status
 - Course schedule
 - Appointment times and information
-- Information required to display the homepage identity card, on TSS backend failure
 
-TSSReg uses this information in your browser to display calendars, enrollment information, the identity card, and course filters. The extension retains only the planner data described below after you close the tab.
+TSSReg uses this information in your browser to display calendars, enrollment information, and course filters. The extension retains only the planner data described below after you close the tab.
 
 ## Data Stored
 
