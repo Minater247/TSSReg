@@ -4,7 +4,7 @@
   const CARD = "card08";
   const ELEMENT_ID = "tssreg-course-count";
   const PAGE_HEADER = "Role";
-  const FALLBACK_ID = "tssreg-identity-fallback";
+  const FALLBACK_CLASS = "tssreg-identity-fallback";
   const FALLBACK_MESSAGE = "TSS did not load the identity card";
   const MY_COURSES = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/MyModules";
 
@@ -15,9 +15,9 @@
 
   window.__tssregShared.whenSapReady(() => {
     sap.ui.require(
-      ["sap/m/QuickViewPage", "sap/m/QuickViewGroupElement"],
-      (QuickViewPage, QuickViewGroupElement) => {
-        modules = { QuickViewPage, QuickViewGroupElement };
+      ["sap/m/QuickViewGroupElement"],
+      (QuickViewGroupElement) => {
+        modules = { QuickViewGroupElement };
         apply();
       }
     );
@@ -52,6 +52,23 @@
     if (active && navEl.contains(active)) active.blur();
   }
 
+  function showFallback(quickViewEl, show) {
+    const current = quickViewEl.querySelector("." + FALLBACK_CLASS);
+    if (!show) {
+      current?.remove();
+      return;
+    }
+    if (current) return;
+
+    // UI5 reuses controls in the bound pages aggregation. Keep the message
+    // outside that aggregation so TSS can create its own page when data arrives.
+    const message = document.createElement("div");
+    message.className = FALLBACK_CLASS;
+    message.setAttribute("role", "status");
+    message.textContent = FALLBACK_MESSAGE;
+    quickViewEl.appendChild(message);
+  }
+
   function apply() {
     if (!shared.isOverviewRoute()) {
       courseRequest = null;
@@ -67,19 +84,9 @@
     const quickView = quickViewEl && sap.ui.getCore().byId(quickViewEl.id);
     if (!quickView) return;
 
-    const pages = quickView.getPages();
-    const page = pages.find((entry) => entry.getId() !== FALLBACK_ID);
-    const fallback = pages.find((entry) => entry.getId() === FALLBACK_ID);
-    if (!page) {
-      if (!fallback && !quickView.getModel()?.hasPendingRequests?.()) {
-        quickView.addPage(new modules.QuickViewPage(FALLBACK_ID, { title: FALLBACK_MESSAGE }));
-      }
-      return;
-    }
-    if (fallback) {
-      quickView.removePage(fallback);
-      fallback.destroy();
-    }
+    const [page] = quickView.getPages();
+    showFallback(quickViewEl, !page && !quickView.getBusy() && !quickView.getModel()?.hasPendingRequests?.());
+    if (!page) return;
     const group = page.getGroups()[0];
     if (!group) return;
 

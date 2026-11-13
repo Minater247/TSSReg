@@ -335,6 +335,19 @@
   user-select: text;
 }
 
+.sapMQuickViewCard:has(> .tssreg-identity-fallback) {
+  position: relative;
+}
+
+.tssreg-identity-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  padding: 1rem;
+  text-align: center;
+}
+
 .tssreg-quicklinks-host {
   flex: 1 1 286px;
   min-width: min(286px, 100%);

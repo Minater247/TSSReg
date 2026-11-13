@@ -1,11 +1,11 @@
 {
   "name": "tssreg",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Unofficial rework of UCSD's TSS to improve the user experience",
   "scripts": {
     "build": "node build.js",
-    "test": "node test/load-order.test.js && node test/network-listeners.test.js && node test/session-dialog.test.js && node test/overview-notices.test.js && node test/courses-catalog.test.js && node test/soc-rooms.test.js && node test/courses-events.test.js && node test/courses-page.test.js && node test/courses-detail.test.js && node test/calendar-layout.test.js && node test/export.test.js",
+    "test": "node test/load-order.test.js && node test/network-listeners.test.js && node test/session-dialog.test.js && node test/overview-notices.test.js && node test/overview-identity.test.js && node test/courses-catalog.test.js && node test/soc-rooms.test.js && node test/courses-events.test.js && node test/courses-page.test.js && node test/courses-detail.test.js && node test/calendar-layout.test.js && node test/export.test.js",
     "package": "npm run lint && node build.js && ./tools/package.sh && npm run validate",
     "icons": "./tools/make-icons.sh",
     "lint": "eslint src/",
