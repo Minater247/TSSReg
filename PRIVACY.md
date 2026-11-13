@@ -1,10 +1,10 @@
 # Privacy Policy
 
-Last updated: 23 September 2026
+Last updated: 13 November 2026
 
 ## Data Collection
 
-No data is collected. The extension does not transmit any data to any server, functional or analytic. No data of any kind reaches me or any third party.
+TSSReg sends requests only to UC San Diego’s official Triton Student System (TSS) at `https://tss.ucsd.edu`. These requests use your existing TSS session to retrieve information for the extension’s features. The extension sends no data to the developer or to any other service and collects no analytics or telemetry.
 
 ## Information Read
 
@@ -17,11 +17,11 @@ Fields include:
 - Appointment times and information
 - Information required to display the homepage identity card, on TSS backend failure
 
-This information is necessary for the two calendar fixtures and to augment the course filters. It is never copied out of the page, is never transmitted anywhere, and is not retained after you close the tab, apart from the schedules described below. No request is made to any host other than `tss.ucsd.edu`.
+TSSReg uses this information in your browser to display calendars, enrollment information, the identity card, and course filters. The extension retains only the planner data described below after you close the tab.
 
 ## Data Stored
 
-No data is stored by us or any third party. The only persistent data in the extension is your planned schedules, which remain in your browser's `localStorage`, accessible only to the TSS page (scoped to `tss.ucsd.edu` origin). They contain:
+TSSReg saves your planned schedules and custom events in your browser’s local storage for `tss.ucsd.edu`. This data stays in your browser. It includes:
 
 - Course codes
 - Course meeting times

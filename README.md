@@ -32,6 +32,6 @@ Run `npm run build` with Node.js to create `dist/`.
 
 ## Privacy
 
-Plans and custom events stay in your browser. Nothing else is stored anywhere, and no data is ever transmitted. [Privacy policy](./PRIVACY.md)
+Plans and custom events stay in your browser. TSSReg sends requests only to UC San Diego’s official TSS servers and collects no telemetry. [Privacy policy](./PRIVACY.md)
 
 TSSReg is an independent project, unaffiliated with UC San Diego.
