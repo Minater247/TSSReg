@@ -259,10 +259,10 @@
     return headerBlock.replace(/Content-Length:\s*\d+/i, "Content-Length: " + byteLength);
   }
 
-  function performRewrite(xhr, originalText, activeFilters) {
+  function performRewrite(request, originalText) {
     const found = findModulePart(originalText);
     if (!found || !found.json.value.length) return Promise.resolve();
-    const query = extractModuleQuery(xhr.__tssRequestBody);
+    const query = extractModuleQuery(request.body);
     if (!query) return Promise.resolve();
     const { year, term } = extractYearTerm(query);
     if (!year || !term) return Promise.resolve();
@@ -270,7 +270,7 @@
       const allRows = (data && data.value) || [];
       if (!allRows.length) return;
       const allIds = allRows.map((r) => r.ModuleID).filter(Boolean);
-      return Promise.all(activeFilters.map((f) => f.matchingIds({ year, term, ids: allIds }))).then((sets) => {
+      return Promise.all(request.filters.map((f) => f.matchingIds({ year, term, ids: allIds }))).then((sets) => {
         const filteredValue = allRows.filter((row) => sets.every((set) => set.has(row.ModuleID)));
         const newJson = Object.assign({}, found.json, { value: filteredValue });
         if (Object.prototype.hasOwnProperty.call(newJson, "@odata.count")) {
@@ -281,7 +281,7 @@
         const before = updateContentLength(seg.slice(0, found.bodyStart), newBodyText);
         const after = seg.slice(found.bodyStart + found.trimmedBodyLength);
         found.segments[found.segIndex] = before + newBodyText + after;
-        xhr.__tssOverrideText = found.segments.join(found.boundary);
+        request.overrideText = found.segments.join(found.boundary);
       });
     });
   }
@@ -304,84 +304,124 @@
     const origOpen = proto.open;
     const origSend = proto.send;
     const origAddEventListener = proto.addEventListener;
+    const origRemoveEventListener = proto.removeEventListener;
+    const requests = new WeakMap();
+    const listeners = new WeakMap();
     const responseTextDescriptor = findDescriptor(proto, "responseText");
     const responseDescriptor = findDescriptor(proto, "response");
     const onloadDescriptor = findDescriptor(proto, "onload");
     const onreadystatechangeDescriptor = findDescriptor(proto, "onreadystatechange");
 
     proto.open = function (method, url) {
-      this.__tssUrl = url;
-      this.__tssIntercept = false;
+      requests.set(this, { url });
       return origOpen.apply(this, arguments);
     };
 
     proto.send = function (body) {
+      const request = requests.get(this);
       const activeFilters = moduleFilters.filter((f) => f.isActive());
-      if (activeFilters.length && this.__tssUrl && String(this.__tssUrl).includes("$batch") && body) {
+      if (activeFilters.length && request && String(request.url).includes("$batch") && body) {
         const text = String(body);
         if (text.indexOf(MODULE_PATH_MARKER) !== -1) {
-          this.__tssIntercept = true;
-          this.__tssRequestBody = text;
-          this.__tssActiveFilters = activeFilters;
+          request.body = text;
+          request.filters = activeFilters;
         }
       }
       return origSend.apply(this, arguments);
     };
 
-    function guard(xhr, fn) {
-      return function () {
-        const self = this;
-        const args = arguments;
-        if (!xhr.__tssIntercept || xhr.readyState !== 4 || xhr.status === 0) {
-          return fn.apply(self, args);
-        }
-        if (!xhr.__tssRewritePromise) {
-          const originalText = responseTextDescriptor.get.call(xhr);
-          xhr.__tssRewritePromise = performRewrite(xhr, originalText, xhr.__tssActiveFilters).catch(() => {});
-        }
-        xhr.__tssRewritePromise.then(() => fn.apply(self, args));
-      };
+    function afterRewrite(xhr, invoke) {
+      const request = requests.get(xhr);
+      if (!request?.filters || xhr.readyState !== 4 || xhr.status === 0) return invoke(true);
+      if (!request.rewrite) {
+        request.rewrite = Promise.resolve()
+          .then(() => {
+            if (requests.get(xhr) === request) return performRewrite(request, responseTextDescriptor.get.call(xhr));
+          })
+          .catch(() => {});
+      }
+      request.rewrite.then(() => invoke(requests.get(xhr) === request));
+    }
+
+    function captureOf(options) {
+      return typeof options === "boolean" ? options : Boolean(options?.capture);
+    }
+
+    function listenerGroup(xhr, type, capture) {
+      let groups = listeners.get(xhr);
+      if (!groups) listeners.set(xhr, (groups = new Map()));
+      const key = type + "|" + capture;
+      if (!groups.has(key)) groups.set(key, new WeakMap());
+      return groups.get(key);
+    }
+
+    function wrapsListener(type, listener) {
+      return (type === "load" || type === "readystatechange") && typeof listener === "function";
     }
 
     proto.addEventListener = function (type, listener, options) {
-      if ((type === "load" || type === "readystatechange") && typeof listener === "function") {
-        return origAddEventListener.call(this, type, guard(this, listener), options);
-      }
-      return origAddEventListener.apply(this, arguments);
+      if (!wrapsListener(type, listener)) return origAddEventListener.apply(this, arguments);
+      const capture = captureOf(options);
+      const group = listenerGroup(this, type, capture);
+      const existing = group.get(listener);
+      if (existing && !existing.signal?.aborted &&
+          (!existing.onceRequest || existing.onceRequest === requests.get(this))) return;
+
+      const once = Boolean(options?.once);
+      const signal = options?.signal;
+      if (signal?.aborted) return;
+
+      // Keep the original callback's identity for duplicate registration and removal.
+      const registration = {
+        signal,
+        wrapped: (event) => {
+          if (once) registration.onceRequest = requests.get(this);
+          afterRewrite(this, (current) => {
+            if (group.get(listener) !== registration || signal?.aborted) return;
+            if (once) group.delete(listener);
+            if (current) listener.call(this, event);
+          });
+        },
+      };
+      origAddEventListener.call(this, type, registration.wrapped, { capture, once, passive: options?.passive, signal });
+      group.set(listener, registration);
     };
 
-    if (onloadDescriptor && onloadDescriptor.set) {
-      Object.defineProperty(proto, "onload", {
+    proto.removeEventListener = function (type, listener, options) {
+      if (!wrapsListener(type, listener)) return origRemoveEventListener.apply(this, arguments);
+      const capture = captureOf(options);
+      const group = listenerGroup(this, type, capture);
+      const registration = group.get(listener);
+      group.delete(listener);
+      return origRemoveEventListener.call(this, type, registration?.wrapped || listener, capture);
+    };
+
+    function patchHandler(property, descriptor) {
+      if (!descriptor?.set) return;
+      const handlers = new WeakMap();
+      Object.defineProperty(proto, property, {
         configurable: true,
         get() {
-          return this.__tssOnload;
+          return handlers.has(this) ? handlers.get(this).callback : descriptor.get.call(this);
         },
         set(fn) {
-          this.__tssOnload = fn;
-          onloadDescriptor.set.call(this, typeof fn === "function" ? guard(this, fn) : fn);
+          const handler = { callback: typeof fn === "function" ? fn : null };
+          handlers.set(this, handler);
+          descriptor.set.call(this, handler.callback && ((event) => afterRewrite(this, (current) => {
+            if (current && handlers.get(this) === handler) fn.call(this, event);
+          })));
         },
       });
     }
 
-    if (onreadystatechangeDescriptor && onreadystatechangeDescriptor.set) {
-      Object.defineProperty(proto, "onreadystatechange", {
-        configurable: true,
-        get() {
-          return this.__tssOnreadystatechange;
-        },
-        set(fn) {
-          this.__tssOnreadystatechange = fn;
-          onreadystatechangeDescriptor.set.call(this, typeof fn === "function" ? guard(this, fn) : fn);
-        },
-      });
-    }
+    patchHandler("onload", onloadDescriptor);
+    patchHandler("onreadystatechange", onreadystatechangeDescriptor);
 
     if (responseTextDescriptor && responseTextDescriptor.get) {
       Object.defineProperty(proto, "responseText", {
         configurable: true,
         get() {
-          if (this.__tssIntercept && this.__tssOverrideText != null) return this.__tssOverrideText;
-          return responseTextDescriptor.get.call(this);
+          return requests.get(this)?.overrideText ?? responseTextDescriptor.get.call(this);
         },
       });
     }
@@ -390,8 +430,7 @@
       Object.defineProperty(proto, "response", {
         configurable: true,
         get() {
-          if (this.__tssIntercept && this.__tssOverrideText != null) return this.__tssOverrideText;
-          return responseDescriptor.get.call(this);
+          return requests.get(this)?.overrideText ?? responseDescriptor.get.call(this);
         },
       });
     }

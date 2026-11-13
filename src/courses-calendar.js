@@ -7,7 +7,6 @@
   const MODE_FINALS = "finals";
   const DAY_MS = 86400000;
   const HIDDEN_CLASS = "tssreg-native-list-hidden";
-  const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
   const ITEMS_EVENT = "tssreg:schedule-items";
   const TERM_EVENT = "tssreg:schedule-term";
   const WEEKDAYS = ["MO", "TU", "WE", "TH", "FR"];
@@ -37,7 +36,7 @@
   const terms = window.__tssregShared.academicTerms;
   const coursesPage = window.__tssregShared.coursesPage;
   const { MIN_BLOCK_HEIGHT, BREATHING_ROOM, TRACK_SLACK } = window.__tssregShared.scheduleExport;
-  const { DAY_NAMES, DAY_ORDER, DAY_FROM_DOW, isCoursesRoute, pageControl, listControl } = coursesPage;
+  const { DAY_NAMES, DAY_ORDER, DAY_FROM_DOW, isCoursesRoute, pageControl, listControl, detailRoute } = coursesPage;
   const { rangeLabel, meridiemLabel, fullRangeLabel, dayListLabel } = coursesPage;
   let modules = null;
   const eventsByPath = {};
@@ -53,6 +52,7 @@
   let layout = null;
   let openBlockKey = null;
   let publishedItems = null;
+  let enrolledRoutes = new Map();
   let publishedSignature = null;
   let mode = MODE_SCHEDULE;
   let dayDates = null;
@@ -256,24 +256,6 @@
     const format = (date) =>
       date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
     return format(start) + " – " + format(end);
-  }
-
-  function detailRoute(row) {
-    return (
-      DETAIL_ROUTE +
-      [
-        row.SmOtype,
-        row.SmObjid,
-        row.ScObjid,
-        row.AssignedCg || row.ScObjid,
-        row.AssignedCgTop || row.AssignedCg || row.ScObjid,
-        "0",
-        row.ModregId,
-        row.EventPackageId,
-        row.AcademicYear,
-        row.AcademicSession,
-      ].join("/")
-    );
   }
 
   function creditsLabel(row) {
@@ -1373,12 +1355,26 @@
     });
   }
 
-  function publishItems(items) {
-    const signature = items && JSON.stringify(items.map((item) => [item.day, item.startMin, item.endMin, item.key]));
+  function publishItems(items, entries = []) {
+    // A booking can have no timed meetings and still needs a Drop action.
+    const routes = new Map();
+    entries.forEach(({ row }) => {
+      if (statusOf(row) !== "enrolled") return;
+      routes.set(catalog.scheduleKey(row.AcademicYear, row.AcademicSession, row.SmObjid, row.EventPackageId), detailRoute(row));
+    });
+    const signature = items && JSON.stringify([
+      items.map((item) => [item.day, item.startMin, item.endMin, item.key, item.status]),
+      [...routes],
+    ]);
     if (signature === publishedSignature) return;
     publishedSignature = signature;
     publishedItems = items;
+    enrolledRoutes = routes;
     window.dispatchEvent(new CustomEvent(ITEMS_EVENT));
+  }
+
+  function enrolledRoute(year, term, moduleId, pkgId) {
+    return enrolledRoutes.get(catalog.scheduleKey(year, term, moduleId, pkgId));
   }
 
   function busyIntervals(year, term) {
@@ -1561,7 +1557,7 @@
     removeLoading();
 
     const scheduled = scheduleItems(scoped).concat(plannedItems(planned), eventItems());
-    publishItems(scheduled);
+    publishItems(scheduled, scoped);
     setNativeListHidden(list, true);
 
     const showing = mode === MODE_FINALS ? finalsItems(scoped).concat(plannedFinalsItems(planned)) : scheduled;
@@ -1576,7 +1572,9 @@
     coursesPage.mountAfterList(page, list, root, FINDER_ID);
   }
 
-  window.__tssregShared.schedule = { ITEMS_EVENT, TERM_EVENT, items: () => publishedItems, term: () => selectedTerm, selectTerm, busyIntervals };
+  window.__tssregShared.schedule = {
+    ITEMS_EVENT, TERM_EVENT, items: () => publishedItems, term: () => selectedTerm, selectTerm, busyIntervals, enrolledRoute,
+  };
 
   window.__tssregShared.onUiUpdated(apply);
   window.addEventListener(plans.CHANGE_EVENT, apply);

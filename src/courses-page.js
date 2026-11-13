@@ -3,6 +3,7 @@
   const PAGE_SELECTOR = '[id$="--mymodulesPage"]';
   const LIST_SUFFIX = /--mymodList$/;
   const SOC_ROUTE = "#YSchedule-view";
+  const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
   const DAY_NAMES = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const DAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
   const DAY_FROM_DOW = { 1: "MO", 2: "TU", 3: "WE", 4: "TH", 5: "FR", 6: "SA", 7: "SU" };
@@ -46,6 +47,21 @@
       odataLiteral(moduleId) +
       ")?layout=TwoColumnsMidExpanded"
     );
+  }
+
+  function detailRoute(row) {
+    return DETAIL_ROUTE + [
+      row.SmOtype,
+      row.SmObjid,
+      row.ScObjid,
+      row.AssignedCg || row.ScObjid,
+      row.AssignedCgTop || row.AssignedCg || row.ScObjid,
+      "0",
+      row.ModregId,
+      row.EventPackageId,
+      row.AcademicYear,
+      row.AcademicSession,
+    ].join("/");
   }
 
   function clockLabel(minutes) {
@@ -102,6 +118,7 @@
     listControl,
     mountAfterList,
     courseRoute,
+    detailRoute,
     clockLabel,
     meridiemLabel,
     rangeLabel,

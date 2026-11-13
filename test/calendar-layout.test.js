@@ -7,6 +7,7 @@ const EXPORT_SRC = path.join(__dirname, "..", "src", "courses-export.js");
 const EVENTS_SRC = path.join(__dirname, "..", "src", "courses-events.js");
 const CATALOG_SRC = path.join(__dirname, "..", "src", "courses-catalog.js");
 const TERMS_SRC = path.join(__dirname, "..", "src", "academic-terms.js");
+const FINDER_SRC = path.join(__dirname, "..", "src", "courses-finder.js");
 
 function evaluate(file, win) {
   const src = fs.readFileSync(file, "utf8");
@@ -29,7 +30,7 @@ function loadCalendar() {
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   const exposed =
     body +
-    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel, planSections, setTerm, termOptions, defaultTerm, terms };";
+    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, enrolledRoute, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel, planSections, setTerm, termOptions, defaultTerm, terms };";
 
   const plain = (value) => String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
   const win = {
@@ -64,18 +65,40 @@ function loadCalendar() {
   });
   evaluate(EXPORT_SRC, win);
   evaluate(EVENTS_SRC, win);
+  const location = { hash: "" };
   const sap = { ui: { require() {}, getCore: () => ({ byId: () => null }) } };
   const doc = { querySelector: () => null };
   const CustomEvent = function (type) {
     this.type = type;
   };
-  return new Function("window", "sap", "document", "location", "CustomEvent", exposed)(
+  const calendar = new Function("window", "sap", "document", "location", "CustomEvent", exposed)(
     win,
     sap,
     doc,
-    { hash: "" },
+    location,
     CustomEvent
   );
+  function Control(settings) {
+    Object.assign(this, settings);
+    this.items ||= [];
+    this.addItem = (item) => this.items.push(item);
+    this.addStyleClass = () => this;
+    this.setTooltip = (tooltip) => { this.tooltip = tooltip; };
+  }
+  win.__tssregShared.plans.hasSection = () => false;
+  sap.ui.require = (names, ready) => ready(...names.map(() => Control));
+  const finderBody = fs.readFileSync(FINDER_SRC, "utf8")
+    .replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
+  calendar.finderGroup = new Function("window", "sap", "location", finderBody + `
+    return (course, packages, conflictMode) => {
+      state.year = "2026";
+      state.term = "3";
+      state.f.conflictMode = conflictMode;
+      sectionsByModule[course.moduleId] = packages;
+      return courseGroup(course, schedule.busyIntervals(state.year, state.term));
+    };
+  `)(win, sap, location);
+  return { ...calendar, location };
 }
 
 const cal = loadCalendar();
@@ -337,6 +360,35 @@ check("matching sessions accept zero-padded codes", cal.busyIntervals("2026", "0
 });
 cal.setTerm({ year: "2026", term: "3" });
 check("switching quarters clears fall intervals before winter meetings load", cal.busyIntervals("2026", "003"), null);
+const untimedBooking = {
+  SmOtype: "SM", SmObjid: "00009462", ScObjid: "00000257", ModregId: "registration",
+  EventPackageId: "00154645", AcademicYear: "2026", AcademicSession: "003", SmStatusText: "Booked",
+};
+cal.publishItems([], [{ row: untimedBooking }]);
+check("an untimed booking still links to the exact TSS course detail", cal.enrolledRoute("2026", "3", "9462", "154645"),
+  "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/SM/00009462/00000257/00000257/00000257/0/registration/00154645/2026/003");
+check("an alternate package does not use the enrolled action", cal.enrolledRoute("2026", "3", "9462", "154646"), undefined);
+check("the same package in another term does not use the enrolled action", cal.enrolledRoute("2026", "2", "9462", "154645"), undefined);
+const bookedBlock = { key: "winter", day: "MO", startMin: 540, endMin: 590, row: untimedBooking };
+cal.publishItems([bookedBlock], [{ row: untimedBooking }]);
+const course = { moduleId: "9462", code: "CSE-123" };
+const packages = ["154645", "154646"].map((pkgId) => ({
+  moduleId: course.moduleId, pkgId,
+  components: [{ meetings: [{ day: "MO", startMin: 540, endMin: 590 }] }],
+}));
+const hiddenConflicts = cal.finderGroup(course, packages, "hide");
+check("Hide Conflicts keeps the booked package and hides the overlapping alternative", hiddenConflicts.items.length, 3);
+const toolbar = hiddenConflicts.items[1];
+check("the booked package has no conflict warning and shows Drop", toolbar.content.map((item) => item.text).filter(Boolean), ["—", "Plan", "Drop"]);
+toolbar.content.find((item) => item.text === "Drop").press();
+check("Drop opens the native detail route", cal.location.hash, cal.enrolledRoute("2026", "3", "9462", "154645"));
+cal.location.hash = "";
+const collapsed = cal.finderGroup(course, packages, "collapse");
+check("the unbooked package still shows a conflict in collapse mode", collapsed.items[3].content[1].text, "Conflicts with your schedule");
+cal.publishItems([], [{ row: untimedBooking }]);
+cal.publishItems([], [{ row: { ...untimedBooking, SmStatusText: "Booked on Waitlist" } }]);
+check("a status change clears the enrolled action even when the calendar still has no blocks",
+  cal.enrolledRoute("2026", "3", "9462", "154645"), undefined);
 cal.setTerm({ year: "2026", term: "2" });
 
 check(

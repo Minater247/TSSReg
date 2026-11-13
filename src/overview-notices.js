@@ -81,6 +81,11 @@
     return Math.max(0, Math.min(1, (end - Date.now()) / (end - begin)));
   }
 
+  function enrollmentLabel(label) {
+    const name = String(label || "").trim() || "enrollment";
+    return /\benrollment(?:\s+pass)?$/i.test(name) ? name : name + " enrollment";
+  }
+
   function computeNotices() {
     const notices = [];
     const { appointments, catalog, bookings } = data;
@@ -111,7 +116,7 @@
       if (open.waitlists) meta.push("Waitlists " + String(open.waitlists).toLowerCase());
       notices.push({
         kind: "open",
-        text: "Your " + (open.timelimit_Text || "enrollment") + " enrollment is open",
+        text: "Your " + enrollmentLabel(open.timelimit_Text) + " is open",
         meta,
         gauge: {
           value: countdownTo(open.endTimestamp) || "—",
@@ -137,7 +142,7 @@
       if (cap != null) meta.push(cap + " unit cap");
       notices.push({
         kind: "info",
-        text: "Your " + (pass.timelimit_Text || "enrollment") + " enrollment hasn't opened yet",
+        text: "Your " + enrollmentLabel(pass.timelimit_Text) + " hasn't opened yet",
         meta,
         gauge: {
           value: countdownTo(pass.beginTimestamp) || "—",

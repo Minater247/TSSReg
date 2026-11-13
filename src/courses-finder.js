@@ -358,7 +358,7 @@
     });
   }
 
-  function packageToolbar(course, pkg, conflicting) {
+  function packageToolbar(course, pkg, conflicting, dropRoute) {
     const content = [text(pkg.label, "tssreg-find-pkg-label"), seatsStatus(pkg)];
     if (conflicting) {
       content.push(
@@ -385,10 +385,10 @@
     content.push(planButton(course, pkg));
     content.push(
       new modules.Button({
-        text: "Enroll",
-        tooltip: "Opens the Schedule of Classes",
+        text: dropRoute ? "Drop" : "Enroll",
+        tooltip: dropRoute ? "Open the TSS detail page to withdraw" : "Opens the Schedule of Classes",
         press: () => {
-          location.hash = coursesPage.courseRoute(state.year, state.term, pkg.moduleId);
+          location.hash = dropRoute || coursesPage.courseRoute(state.year, state.term, pkg.moduleId);
         },
       })
     );
@@ -427,30 +427,31 @@
     return row;
   }
 
-  function visiblePackages(course, busy) {
+  function visiblePackages(course) {
     const f = state.f;
     const days = catalog.picked(f.days);
     return (sectionsByModule[course.moduleId] || []).filter((pkg) => {
       if (!catalog.match.days(pkg, days)) return false;
       if (!catalog.match.seats(pkg, f.avail)) return false;
       if (!catalog.match.timeRange(pkg, f.timeMin, f.timeMax)) return false;
-      if (f.conflictMode === "hide" && catalog.conflicts(pkg, busy)) return false;
       return true;
     });
   }
 
   function courseGroup(course, busy) {
-    const packages = visiblePackages(course, busy);
+    const packages = visiblePackages(course).map((pkg) => {
+      const dropRoute = schedule.enrolledRoute(state.year, state.term, pkg.moduleId, pkg.pkgId);
+      return { pkg, dropRoute, conflicting: !dropRoute && catalog.conflicts(pkg, busy) };
+    }).filter(({ conflicting }) => state.f.conflictMode !== "hide" || !conflicting);
     if (!packages.length) return null;
     const group = new modules.VBox({ renderType: "Bare", items: [courseHeader(course)] });
     group.addStyleClass("tssreg-find-course");
-    packages.forEach((pkg) => {
-      const conflicting = catalog.conflicts(pkg, busy);
+    packages.forEach(({ pkg, dropRoute, conflicting }) => {
       if (conflicting && state.f.conflictMode === "collapse" && !expanded[pkg.moduleId + "|" + pkg.pkgId]) {
         group.addItem(collapsedPackage(pkg));
         return;
       }
-      group.addItem(packageToolbar(course, pkg, conflicting));
+      group.addItem(packageToolbar(course, pkg, conflicting, dropRoute));
       group.addItem(componentTable(course, pkg));
     });
     return group;
