@@ -385,6 +385,11 @@ check("Drop opens the native detail route", cal.location.hash, cal.enrolledRoute
 cal.location.hash = "";
 const collapsed = cal.finderGroup(course, packages, "collapse");
 check("the unbooked package still shows a conflict in collapse mode", collapsed.items[3].content[1].text, "Conflicts with your schedule");
+const enrollment = cal.finderGroup(course, [packages[1]], "").items[1].content.find((item) => item.text === "Enroll");
+enrollment.press();
+check("Enroll opens booking for the exact unbooked package", cal.location.hash,
+  cal.coursesPage.bookingRoute("2026", "3", "9462", "154646"));
+cal.location.hash = "";
 cal.publishItems([], [{ row: untimedBooking }]);
 cal.publishItems([], [{ row: { ...untimedBooking, SmStatusText: "Booked on Waitlist" } }]);
 check("a status change clears the enrolled action even when the calendar still has no blocks",

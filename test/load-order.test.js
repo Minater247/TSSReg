@@ -141,6 +141,37 @@ check("the page helpers survive load", typeof shared.coursesPage.meetingLabel, "
 check("the catalog reuses the shared service root", shared.serviceUrl("X").endsWith("/0001/X"), true);
 check("the export renderer is ready", typeof shared.scheduleExport.download, "function");
 
+// ---------- TSS home navigation ----------
+const home = "#YStudent-Overview";
+const alias = home + "?sap-app-origin-hint=";
+const homeLocation = { hash: alias, replace(hash) { this.hash = hash; } };
+let logoClick;
+let hashChanged;
+vm.runInNewContext(fs.readFileSync(path.join(SRC, "shell-home.js"), "utf8"), {
+  location: homeLocation,
+  document: { addEventListener(type, fn, capture) { if (type === "click" && capture) logoClick = fn; } },
+  window: { addEventListener(type, fn) { if (type === "hashchange") hashChanged = fn; } },
+});
+check("direct visits clean up the empty home origin hint", homeLocation.hash, home);
+homeLocation.hash = "#YSchedule-view";
+const click = {
+  button: 0,
+  target: { closest: (selector) => selector === "#shell-header-icon" },
+  preventDefault() { this.prevented = true; },
+  stopImmediatePropagation() { this.stopped = true; },
+};
+logoClick({ ...click, target: { closest: () => null } });
+logoClick({ ...click, metaKey: true });
+check("ordinary page clicks and modified clicks retain their native behavior", homeLocation.hash, "#YSchedule-view");
+logoClick(click);
+check("the home logo goes directly to Student Overview", [homeLocation.hash, click.prevented, click.stopped], [home, true, true]);
+homeLocation.hash = alias;
+hashChanged();
+check("in-app home links clean up the empty origin hint", homeLocation.hash, home);
+homeLocation.hash = home + "?sap-app-origin-hint=remote";
+hashChanged();
+check("a non-empty origin hint remains available to the shell", homeLocation.hash, home + "?sap-app-origin-hint=remote");
+
 console.log(passed + " passed, " + failures.length + " failed");
 failures.forEach((line) => console.log("  FAIL " + line));
 process.exit(failures.length ? 1 : 0);

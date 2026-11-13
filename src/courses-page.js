@@ -4,6 +4,8 @@
   const LIST_SUFFIX = /--mymodList$/;
   const SOC_ROUTE = "#YSchedule-view";
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
+  const BOOKING_ROUTE = "#ZUSModule-display?TileType=MYMOD&/Detail/EventPackage/";
+  const EMPTY_REGISTRATION = "00000000-0000-0000-0000-000000000000";
   const DAY_NAMES = { MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun" };
   const DAY_ORDER = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
   const DAY_FROM_DOW = { 1: "MO", 2: "TU", 3: "WE", 4: "TH", 5: "FR", 6: "SA", 7: "SU" };
@@ -64,6 +66,15 @@
     ].join("/");
   }
 
+  /** Returns the TSS booking link for a catalog package, or the course link if the package details are incomplete. */
+  function bookingRoute(year, term, moduleId, pkgId) {
+    if (!year || !term || !moduleId || !pkgId) return courseRoute(year, term, moduleId);
+    // The booking route uses empty registration and course-group fields for an unbooked package.
+    const { plainId } = window.__tssregShared.catalog;
+    const parts = ["SM", plainId(moduleId), "00000000", "0", "0", "0", EMPTY_REGISTRATION, plainId(pkgId), year, plainId(term)];
+    return BOOKING_ROUTE + parts.map(encodeURIComponent).join("/") + "/?";
+  }
+
   function clockLabel(minutes) {
     const hours = Math.floor(minutes / 60);
     return (hours % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0");
@@ -119,6 +130,7 @@
     mountAfterList,
     courseRoute,
     detailRoute,
+    bookingRoute,
     clockLabel,
     meridiemLabel,
     rangeLabel,

@@ -9,6 +9,7 @@ function loadPage() {
   const win = {
     __tssregShared: {
       odataLiteral: (value) => "'" + String(value).replace(/'/g, "''") + "'",
+      catalog: { plainId: (value) => String(value).replace(/^0+(?=\d)/, "") },
     },
   };
   new Function("window", "sap", "document", "location", body)(win, null, null, { hash: "" });
@@ -74,6 +75,13 @@ check(
 );
 check("a term-less route falls back to the search page", page.courseRoute("", "2", "10491"), "#YSchedule-view");
 check("a year-less route falls back to the search page", page.courseRoute("2026", "", "10491"), "#YSchedule-view");
+check(
+  "the booking route opens the selected package in the selected quarter",
+  page.bookingRoute("2026", "003", "00008644", "00165071"),
+  "#ZUSModule-display?TileType=MYMOD&/Detail/EventPackage/SM/8644/00000000/0/0/0/00000000-0000-0000-0000-000000000000/165071/2026/3/?"
+);
+check("a missing package falls back to the course detail", page.bookingRoute("2026", "3", "8644", ""),
+  page.courseRoute("2026", "3", "8644"));
 
 console.log(passed + " passed, " + failures.length + " failed");
 failures.forEach((line) => console.log("  FAIL " + line));

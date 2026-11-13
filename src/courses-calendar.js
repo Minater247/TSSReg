@@ -661,10 +661,10 @@
         new modules.Button({
           text: "Enroll",
           type: "Emphasized",
-          tooltip: "Open this course in the Schedule of Classes",
+          tooltip: "Open this section in TSS booking",
           press: () => {
             closePopover();
-            location.hash = coursesPage.courseRoute(section.year, section.term, section.moduleId);
+            location.hash = coursesPage.bookingRoute(section.year, section.term, section.moduleId, section.pkgId);
           },
         }),
         new modules.Button({

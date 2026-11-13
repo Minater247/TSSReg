@@ -386,9 +386,9 @@
     content.push(
       new modules.Button({
         text: dropRoute ? "Drop" : "Enroll",
-        tooltip: dropRoute ? "Open the TSS detail page to withdraw" : "Opens the Schedule of Classes",
+        tooltip: dropRoute ? "Open the TSS detail page to withdraw" : "Open this section in TSS booking",
         press: () => {
-          location.hash = dropRoute || coursesPage.courseRoute(state.year, state.term, pkg.moduleId);
+          location.hash = dropRoute || coursesPage.bookingRoute(state.year, state.term, pkg.moduleId, pkg.pkgId);
         },
       })
     );
