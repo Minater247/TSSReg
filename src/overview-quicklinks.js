@@ -5,10 +5,12 @@
   const GRID_ID = "tssreg-quicklinks";
 
   let modules = null;
+  let renderedLinks = null;
 
   window.__tssregShared.whenSapReady(() => {
     sap.ui.require(["sap/m/VBox", "sap/m/Image", "sap/m/Text"], (VBox, Image, Text) => {
       modules = { VBox, Image, Text };
+      apply();
     });
   });
 
@@ -59,24 +61,32 @@
       host = document.createElement("div");
       host.className = "tssreg-quicklinks-host";
     }
-    band.insertBefore(cardWrapper, band.firstChild);
-    band.insertBefore(host, cardWrapper.nextSibling);
+    if (band.firstChild !== cardWrapper) band.insertBefore(cardWrapper, band.firstChild);
+    if (cardWrapper.nextSibling !== host) band.insertBefore(host, cardWrapper.nextSibling);
     return host;
   }
 
   function apply() {
     if (!shared.isOverviewRoute() || !modules) return;
-    if (document.getElementById(GRID_ID)) return;
 
     const inner = document.querySelector(".sapUshellEasyScanLayoutInner");
     const cardWrapper = inner && inner.querySelector('[id$="--' + IDENTITY_CARD + '"]');
     if (!inner || !cardWrapper) return;
 
-    const links = shared.overviewPrimaryLinks();
-    if (!links) return;
+    const host = mountBand(inner, cardWrapper);
+    const links = shared.overviewPrimaryLinks() || [];
+    host.hidden = links.length === 0;
+    if (!links.length) return;
 
-    const grid = sap.ui.getCore().byId(GRID_ID) || buildGrid(links);
-    grid.placeAt(mountBand(inner, cardWrapper));
+    const signature = JSON.stringify(links);
+    let grid = sap.ui.getCore().byId(GRID_ID);
+    if (grid && signature !== renderedLinks) {
+      grid.destroyItems();
+      links.forEach((link) => grid.addItem(tile(link)));
+    }
+    if (!grid) grid = buildGrid(links);
+    renderedLinks = signature;
+    if (grid.getDomRef()?.parentElement !== host) grid.placeAt(host);
   }
 
   shared.onUiUpdated(apply);

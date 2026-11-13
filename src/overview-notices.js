@@ -1,9 +1,8 @@
 (() => {
   const shared = window.__tssregShared;
+  const terms = shared.academicTerms;
   const BAND_ID = "tssreg-notice-band";
   const LIST_ID = "tssreg-notices";
-  const COURSES_CARD = "card05";
-  const APPT_ROOT = "/sap/opu/odata4/sap/ysb_appttime/srvd/sap/ysd_appttimes/0001/";
   const MY_COURSES = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/MyModules";
   const MY_HOLDS = "#YStudent-myHolds";
   const APPT_TIMES = "#YStudent-apptTimes";
@@ -12,7 +11,7 @@
 
   let modules = null;
   let data = null;
-  let fetchStarted = false;
+  let request = null;
   let rendered = null;
 
   window.__tssregShared.whenSapReady(() => {
@@ -22,58 +21,30 @@
   });
 
   function ensureData() {
-    if (fetchStarted) return;
-    fetchStarted = true;
-    const get = (name) =>
-      fetch(APPT_ROOT + name, { credentials: "include", headers: { Accept: "application/json" } })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((json) => (json && json.value) || []);
-    Promise.all([get("apptPeriods"), get("apptTimes"), get("maxUnits")])
-      .then(([periods, times, maxUnits]) => {
-        data = { period: periods[0] || null, times, maxUnits };
-      })
-      .catch(() => {
-        data = { period: null, times: [], maxUnits: [] };
-      });
+    if (request) return;
+    request = Promise.all([terms.loadAppointments(), terms.loadUnitCaps(), shared.catalog.loadTerms(), terms.loadBookings()]);
+    const pending = request;
+    pending.then(([appointments, maxUnits, catalog, bookings]) => {
+      if (request !== pending) return;
+      data = { appointments, maxUnits, catalog, bookings };
+      apply();
+    });
   }
 
-  function bookedModules() {
-    const cardEl = document.querySelector('[id*="--' + COURSES_CARD + 'Original"]');
-    const listEl = cardEl && cardEl.querySelector(".sapMList");
-    const list = listEl && sap.ui.getCore().byId(listEl.id);
-    if (!list) return [];
-    const info = list.getBindingInfo("items");
-    return list
-      .getItems()
-      .map((item) => {
-        const context = item.getBindingContext(info && info.model);
-        return context ? context.getObject() : null;
-      })
-      .filter(Boolean);
-  }
-
-  function enrolledUnits() {
-    return bookedModules().reduce((sum, row) => {
+  function enrolledUnits(bookings, scope) {
+    return terms.coursesFor(bookings, scope).reduce((sum, row) => {
       const credits = parseFloat(row.Credits);
       return sum + (isNaN(credits) ? 0 : credits);
     }, 0);
   }
 
-  function applicableWindows() {
-    const period = data.period;
-    if (!period) return [];
-    return data.times.filter(
-      (row) => row.calendarId === period.calendarId && (row.bkgWindow === period.bkgWindow || row.bkgWindow === "")
-    );
-  }
-
-  function maxUnitsFor(timelimit) {
-    const period = data.period;
-    if (!period) return null;
-    const row = data.maxUnits.filter(
+  function maxUnitsFor(period, timelimit) {
+    const row = data.maxUnits.find(
       (entry) =>
-        entry.ProgType === period.programType && entry.Perid === period.academicSession && entry.Timelimit === timelimit
-    )[0];
+        entry.ProgType === period.programType && entry.Timelimit === timelimit &&
+        terms.key(period.academicYear, entry.Perid) === terms.key(period.academicYear, period.academicSession) &&
+        (!entry.Peryr || String(entry.Peryr) === String(period.academicYear))
+    );
     return row ? row.MaxUnits : null;
   }
 
@@ -112,9 +83,12 @@
 
   function computeNotices() {
     const notices = [];
-    const period = data.period;
+    const { appointments, catalog, bookings } = data;
+    const now = Date.now();
+    const period = terms.openPeriod(appointments, catalog, now) ||
+      (appointments.periods.length === 1 ? appointments.periods[0] : null);
 
-    if (period && period.holdLevel) {
+    if (period ? period.holdLevel : appointments.periods.some((row) => row.holdLevel)) {
       notices.push({
         kind: "blocked",
         text: "A hold is blocking your enrollment",
@@ -124,15 +98,15 @@
       });
     }
 
-    const windows = applicableWindows();
-    const open = windows
-      .filter((row) => row.timelimitStatus === "A")
-      .sort((a, b) => String(a.endTimestamp).localeCompare(String(b.endTimestamp)))[0];
+    const open = period && terms.windowsFor(period, appointments)
+      .filter((row) => terms.isOpen(row, now))
+      .sort((a, b) => Date.parse(a.endTimestamp) - Date.parse(b.endTimestamp))[0];
 
     if (open) {
       const meta = [];
-      const cap = maxUnitsFor(open.timelimit);
-      meta.push(enrolledUnits() + " units enrolled");
+      const cap = maxUnitsFor(period, open.timelimit);
+      const scope = terms.appointmentTerm(period);
+      if (bookings && terms.key(scope.year, scope.term)) meta.push(enrolledUnits(bookings, scope) + " units enrolled");
       if (cap != null) meta.push(cap + " unit cap");
       if (open.waitlists) meta.push("Waitlists " + String(open.waitlists).toLowerCase());
       notices.push({
@@ -151,23 +125,25 @@
       return notices;
     }
 
-    const next = windows
-      .filter((row) => row.timelimitStatus === "U")
-      .sort((a, b) => String(a.beginTimestamp).localeCompare(String(b.beginTimestamp)))[0];
+    const next = appointments.periods.flatMap((period) => terms.windowsFor(period, appointments)
+      .filter((pass) => pass.timelimitStatus === "U" && Date.parse(pass.beginTimestamp) > now)
+      .map((pass) => ({ period, pass })))
+      .sort((a, b) => Date.parse(a.pass.beginTimestamp) - Date.parse(b.pass.beginTimestamp))[0];
 
     if (next) {
+      const { period, pass } = next;
       const meta = [];
-      const cap = maxUnitsFor(next.timelimit);
+      const cap = maxUnitsFor(period, pass.timelimit);
       if (cap != null) meta.push(cap + " unit cap");
       notices.push({
         kind: "info",
-        text: "Your " + (next.timelimit_Text || "enrollment") + " enrollment hasn't opened yet",
+        text: "Your " + (pass.timelimit_Text || "enrollment") + " enrollment hasn't opened yet",
         meta,
         gauge: {
-          value: countdownTo(next.beginTimestamp) || "—",
+          value: countdownTo(pass.beginTimestamp) || "—",
           fraction: null,
           href: APPT_TIMES,
-          title: "Opens " + formatInstant(next.beginTimestamp),
+          title: "Opens " + formatInstant(pass.beginTimestamp),
         },
         actionLabel: "Details",
         actionHref: APPT_TIMES,
@@ -303,7 +279,12 @@
   }
 
   function apply() {
-    if (!shared.isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute()) {
+      request = null;
+      data = null;
+      return;
+    }
+    if (!modules) return;
     ensureData();
     if (!data) return;
 

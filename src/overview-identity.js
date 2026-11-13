@@ -1,7 +1,7 @@
 (() => {
   const shared = window.__tssregShared;
+  const terms = shared.academicTerms;
   const CARD = "card08";
-  const COURSES_CARD = "card05";
   const ELEMENT_ID = "tssreg-course-count";
   const PAGE_HEADER = "Role";
   const FALLBACK_ID = "tssreg-identity-fallback";
@@ -14,6 +14,8 @@
   let modules = null;
   let identity = null;
   let identityState = null;
+  let courseRequest = null;
+  let courseCount = null;
   const calmedNavs = new WeakSet();
 
   window.__tssregShared.whenSapReady(() => {
@@ -21,17 +23,21 @@
       ["sap/m/QuickViewPage", "sap/m/QuickViewGroup", "sap/m/QuickViewGroupElement"],
       (QuickViewPage, QuickViewGroup, QuickViewGroupElement) => {
         modules = { QuickViewPage, QuickViewGroup, QuickViewGroupElement };
+        apply();
       }
     );
   });
 
-  function courseCount() {
-    const cardEl = shared.cardElement(COURSES_CARD);
-    const listEl = cardEl && cardEl.querySelector(".sapMList");
-    const list = listEl && sap.ui.getCore().byId(listEl.id);
-    if (!list) return 0;
-    const binding = list.getBinding("items");
-    return binding ? binding.getLength() : list.getItems().length;
+  function loadCourseCount() {
+    if (courseRequest) return;
+    const pending = Promise.all([terms.loadBookings(), shared.catalog.loadTerms()]);
+    courseRequest = pending;
+    pending.then(([bookings, catalog]) => {
+      if (courseRequest !== pending) return;
+      const scope = terms.currentTerm(catalog);
+      courseCount = bookings && scope ? terms.coursesFor(bookings, scope).length : null;
+      apply();
+    });
   }
 
   function hideEmptyRows(group) {
@@ -134,7 +140,13 @@
   }
 
   function apply() {
-    if (!shared.isOverviewRoute() || !modules) return;
+    if (!shared.isOverviewRoute()) {
+      courseRequest = null;
+      courseCount = null;
+      return;
+    }
+    if (!modules || !shared.catalog) return;
+    loadCourseCount();
 
     const cardEl = shared.cardElement(CARD);
     if (cardEl) calmNavContainer(cardEl);
@@ -164,11 +176,12 @@
     hideEmptyRows(group);
     dropLabels(group);
 
-    const count = courseCount();
-    if (!count) return;
-    const text = count + (count === 1 ? " course" : " courses") + " this term";
-
     const existing = sap.ui.getCore().byId(ELEMENT_ID);
+    if (courseCount == null) {
+      if (existing) existing.destroy();
+      return;
+    }
+    const text = courseCount + (courseCount === 1 ? " course" : " courses") + " this term";
     if (existing) {
       if (existing.getValue() !== text) existing.setValue(text);
       return;

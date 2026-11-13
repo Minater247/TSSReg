@@ -187,6 +187,36 @@ check(
   { code: "Center Hall", number: "105", coded: false }
 );
 
+// ---------- building codes in section locations ----------
+const bldgRows = [
+  { ModuleID: "1", BuildingID: "EBU3B", BuildingText: "Computer Science and Engineering Buildin" },
+  { ModuleID: "2", BuildingID: "CENTR", BuildingText: "Center Hall" },
+];
+const bldgCodes = {};
+bldgRows.forEach((row) => (bldgCodes[row.BuildingText] = row.BuildingID));
+
+check(
+  "a name TSS cut off mid-word becomes its campus code",
+  catalog.locationLabel("Computer Science and Engineering Buildin Room B260", bldgCodes),
+  "EBU3B B260"
+);
+check(
+  "a name that was never cut off still becomes its code",
+  catalog.locationLabel("Center Hall Room 105", bldgCodes),
+  "CENTR 105"
+);
+check(
+  "a bare building name with no room resolves on its own",
+  catalog.locationLabel("Computer Science and Engineering Buildin", bldgCodes),
+  "EBU3B"
+);
+check(
+  "a building the term never listed keeps the text TSS wrote",
+  catalog.locationLabel("Somewhere New Room 12", bldgCodes),
+  "Somewhere New Room 12"
+);
+check("an empty location stays empty", catalog.locationLabel("", bldgCodes), "");
+
 console.log(passed + " passed, " + failures.length + " failed");
 failures.forEach((line) => console.log("  FAIL " + line));
 process.exit(failures.length ? 1 : 0);

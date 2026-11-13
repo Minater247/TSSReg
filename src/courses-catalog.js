@@ -249,6 +249,23 @@
     return out;
   }
 
+  function buildingCodes(rows) {
+    const out = {};
+    rows.forEach((row) => {
+      if (row.BuildingText && row.BuildingID) out[row.BuildingText] = row.BuildingID;
+    });
+    return out;
+  }
+
+  function locationLabel(text, codes) {
+    const raw = String(text || "").trim();
+    if (!raw) return "";
+    if (codes[raw]) return codes[raw];
+    const parts = roomParts(raw, codes);
+    if (!parts || !parts.coded) return raw;
+    return parts.number ? parts.code + " " + parts.number : parts.code;
+  }
+
   function buildingsByModule(rows) {
     const out = {};
     rows.forEach((row) => {
@@ -260,6 +277,7 @@
   function buildSections(ids, schedule, events, buildings, year, term) {
     const meetings = meetingsByModule(schedule);
     const building = buildingsByModule(buildings);
+    const codes = buildingCodes(buildings);
     const out = {};
     ids.forEach((id) => {
       const packages = {};
@@ -287,7 +305,7 @@
             type: row.TeachingMethod_Text || row.TeachingMethod || "",
             methodCode: row.TeachingMethod || "",
             instructor: row.InstructorName || "",
-            location: roomFrom(row.Sched) || building[id] || "",
+            location: locationLabel(roomFrom(row.Sched) || building[id] || "", codes),
             meetings: meetings[scheduleKey(year, term, id, row.EventObjid)] || [],
           });
         });
@@ -482,6 +500,7 @@
     finalFromSched,
     finalsFromEvents,
     loadBuildings,
+    locationLabel,
     roomParts,
     scheduleKey,
     plainId: stripPad,

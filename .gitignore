@@ -2,3 +2,6 @@ dist/
 node_modules/
 build/
 keys/
+STORE.md
+tools/
+BUGLOG.md

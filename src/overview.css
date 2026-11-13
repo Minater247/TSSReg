@@ -141,7 +141,7 @@
 
 .tssreg-more-band {
   grid-column: 1 / -1;
-  order: 1;
+  order: 4;
   padding: 8px;
   box-sizing: border-box;
   text-align: left;
@@ -188,6 +188,14 @@
 
 .sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) {
   align-self: stretch;
+}
+
+.sapUshellEasyScanLayoutInner > [id$="--card01"] { order: 0; }
+.sapUshellEasyScanLayoutInner > [id$="--card02"] { order: 1; }
+.sapUshellEasyScanLayoutInner > [id$="--card03"] { order: 2; }
+
+.sapUshellEasyScanLayoutInner > .easyScanLayoutItemWrapper:not(:is([id$="--card01"], [id$="--card02"], [id$="--card03"], [id$="--card12"])) {
+  order: 3;
 }
 
 .sapUshellEasyScanLayoutInner > :is([id$="--card01"], [id$="--card02"], [id$="--card03"]) > div,
@@ -326,6 +334,11 @@
   height: 100% !important;
 }
 
+.tssreg-top-band .sapMQuickViewPage .sapUiSelectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .tssreg-quicklinks-host {
   flex: 1 1 286px;
   min-width: 286px;
@@ -409,6 +422,7 @@
 
 #tssreg-week-strip .tssreg-week-scroll {
   overflow-x: auto;
+  position: relative;
 }
 
 #tssreg-week-strip .tssreg-week-day {
@@ -419,6 +433,23 @@
   min-height: 120px;
   box-sizing: border-box;
   gap: 6px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+#tssreg-week-strip .tssreg-week-loading .tssreg-week-day {
+  opacity: 0.35;
+}
+
+#tssreg-week-strip .tssreg-week-loading-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--tssreg-muted);
+  pointer-events: none;
 }
 
 #tssreg-week-strip .tssreg-week-day.tssreg-is-today {

@@ -9,6 +9,7 @@
   const HIDDEN_CLASS = "tssreg-native-list-hidden";
   const DETAIL_ROUTE = "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/Detail/MyModules/";
   const ITEMS_EVENT = "tssreg:schedule-items";
+  const TERM_EVENT = "tssreg:schedule-term";
   const WEEKDAYS = ["MO", "TU", "WE", "TH", "FR"];
   const STATUS_LABEL = { enrolled: "Enrolled", waitlisted: "Waitlisted", planned: "Planned", event: "Event", other: "" };
   const LEGEND_ORDER = ["enrolled", "waitlisted", "planned", "event", "other"];
@@ -33,12 +34,13 @@
   const plans = window.__tssregShared.plans;
   const events = window.__tssregShared.events;
   const catalog = window.__tssregShared.catalog;
+  const terms = window.__tssregShared.academicTerms;
   const coursesPage = window.__tssregShared.coursesPage;
   const { MIN_BLOCK_HEIGHT, BREATHING_ROOM, TRACK_SLACK } = window.__tssregShared.scheduleExport;
   const { DAY_NAMES, DAY_ORDER, DAY_FROM_DOW, isCoursesRoute, pageControl, listControl } = coursesPage;
   const { rangeLabel, meridiemLabel, fullRangeLabel, dayListLabel } = coursesPage;
   let modules = null;
-  const eventsByPackage = {};
+  const eventsByPath = {};
   const meetingsBySection = {};
   const finalsByPackage = {};
   const buildings = {};
@@ -55,6 +57,11 @@
   let mode = MODE_SCHEDULE;
   let dayDates = null;
   let readEpoch = 0;
+  let termRequest = null;
+  let termData = null;
+  let availableTerms = [];
+  let selectedTerm = null;
+  let manualTerm = false;
 
   window.__tssregShared.whenSapReady(() => {
     sap.ui.require(
@@ -123,25 +130,24 @@
   }
 
   function ensureEvents(entries) {
-    entries.forEach(({ path, row, model }) => {
-      const pkg = row.EventPackageId;
-      if (eventsByPackage[pkg] || pending[pkg]) return;
-      pending[pkg] = true;
+    entries.forEach(({ path, model }) => {
+      if (eventsByPath[path] || pending[path]) return;
+      pending[path] = true;
       const entry = { epoch: readEpoch };
       inFlight.push(entry);
       entry.handle = model.read(path + "/Event", {
         success: (data) => {
           dropRead(entry);
           if (entry.epoch !== readEpoch) return;
-          delete pending[pkg];
-          eventsByPackage[pkg] = data.results || (data.EventId ? [data] : []);
+          delete pending[path];
+          eventsByPath[path] = data.results || (data.EventId ? [data] : []);
           apply();
         },
         error: () => {
           dropRead(entry);
           if (entry.epoch !== readEpoch) return;
-          delete pending[pkg];
-          eventsByPackage[pkg] = [];
+          delete pending[path];
+          eventsByPath[path] = [];
           apply();
         },
       });
@@ -152,9 +158,13 @@
     return catalog.scheduleKey(row.AcademicYear, row.AcademicSession, row.SmObjid, "");
   }
 
-  function planSections() {
-    const plan = plans.current();
-    return plan ? plan.sections.filter((section) => section.year && section.term) : [];
+  function scopeKey(scope) {
+    return scope ? terms.key(scope.year, scope.term) : "";
+  }
+
+  function planSections(plan = plans.current()) {
+    const key = scopeKey(selectedTerm);
+    return plan && key ? plan.sections.filter((section) => scopeKey(section) === key) : [];
   }
 
   function planModuleKey(section) {
@@ -170,13 +180,13 @@
     if (group.keys.indexOf(key) === -1) group.keys.push(key);
   }
 
-  function ensureMeetings(entries) {
+  function ensureMeetings(entries, planned) {
     const groups = {};
     entries.forEach(({ row }) =>
-      collect(groups, row.AcademicYear, row.AcademicSession, row.SmObjid, moduleKey(row))
+      collect(groups, selectedTerm.year, selectedTerm.term, row.SmObjid, moduleKey(row))
     );
-    planSections().forEach((section) =>
-      collect(groups, section.year, section.term, section.moduleId, planModuleKey(section))
+    planned.forEach((section) =>
+      collect(groups, selectedTerm.year, selectedTerm.term, section.moduleId, planModuleKey(section))
     );
     Object.keys(groups).forEach((name) => {
       const group = groups[name];
@@ -189,7 +199,7 @@
         .then(([found, finals, halls]) => {
           Object.keys(found).forEach((key) => (meetingsBySection[key] = found[key]));
           finals.forEach((final) => {
-            finalsByPackage[final.moduleId + "|" + final.pkgId] = final;
+            finalsByPackage[catalog.scheduleKey(group.year, group.term, final.moduleId, final.pkgId)] = final;
           });
           Object.keys(halls).forEach((key) => (buildings[key] = halls[key]));
           group.keys.forEach((key) => {
@@ -274,8 +284,8 @@
 
   function scheduleItems(entries) {
     const items = [];
-    entries.forEach(({ row }) => {
-      const events = eventsByPackage[row.EventPackageId];
+    entries.forEach(({ path, row }) => {
+      const events = eventsByPath[path];
       if (!events) return;
       const status = statusOf(row);
       events.forEach((event) => {
@@ -335,7 +345,7 @@
   function finalsItems(entries) {
     const items = [];
     entries.forEach(({ row }) => {
-      const final = finalsByPackage[catalog.plainId(row.SmObjid) + "|" + catalog.plainId(row.EventPackageId)];
+      const final = finalsByPackage[catalog.scheduleKey(row.AcademicYear, row.AcademicSession, row.SmObjid, row.EventPackageId)];
       if (!final) return;
       items.push(
         finalItem(final, "final|" + row.EventPackageId, statusOf(row), row.SmShort || "", row.SmStext || "", { row })
@@ -383,11 +393,9 @@
     return (dayDates && dayDates[day]) || DAY_NAMES[day];
   }
 
-  function plannedItems() {
-    const plan = plans.current();
-    if (!plan) return [];
+  function plannedItems(sections) {
     const items = [];
-    plan.sections.forEach((section) => {
+    sections.forEach((section) => {
       section.components.forEach((component, index) => {
         const labels = roomLabels(component.location);
         component.meetings.forEach((meeting) => {
@@ -441,10 +449,10 @@
     return items;
   }
 
-  function plannedFinalsItems() {
+  function plannedFinalsItems(sections) {
     const items = [];
-    planSections().forEach((section) => {
-      const final = finalsByPackage[catalog.plainId(section.moduleId) + "|" + catalog.plainId(section.pkgId)];
+    sections.forEach((section) => {
+      const final = finalsByPackage[catalog.scheduleKey(section.year, section.term, section.moduleId, section.pkgId)];
       if (!final) return;
       items.push(
         finalItem(final, "planfinal|" + section.moduleId + "|" + section.pkgId, "planned", section.courseCode, section.title, {
@@ -503,9 +511,10 @@
     return sorted;
   }
 
+  /** Returns the hour bounds for the calendar, including 8 AM and any earlier meetings. */
   function timeRange(items) {
     if (!items.length) return { startMin: 8 * 60, endMin: 17 * 60 };
-    const startMin = Math.min(...items.map((item) => item.startMin));
+    const startMin = Math.min(8 * 60, ...items.map((item) => item.startMin));
     const endMin = Math.max(...items.map((item) => item.endMin));
     return { startMin: Math.floor(startMin / 60) * 60, endMin: Math.ceil(endMin / 60) * 60 };
   }
@@ -685,7 +694,7 @@
               : "Unplans this class",
           press: () => {
             closePopover();
-            plans.removeSection(section.moduleId, section.pkgId);
+            plans.removeSection(section.moduleId, section.pkgId, section.year, section.term);
           },
         }),
       ],
@@ -1071,7 +1080,7 @@
   }
 
   function planLabel(plan) {
-    return plan.name + " (" + plan.sections.length + ")";
+    return plan.name + " (" + planSections(plan).length + ")";
   }
 
   function planMenu(plan, all) {
@@ -1130,10 +1139,85 @@
     return picker;
   }
 
+  function loadTermData() {
+    const appointments = terms.loadAppointments();
+    if (termRequest === appointments) return;
+    termRequest = appointments;
+    Promise.all([catalog.loadTerms(), appointments]).then(([catalog, data]) => {
+      if (termRequest !== appointments) return;
+      termData = { catalog, appointments: data };
+      apply();
+    });
+  }
+
+  function termOptions(entries, { catalog, appointments }, current) {
+    const options = new Map();
+    function add(scope) {
+      const key = scopeKey(scope);
+      if (!key) return;
+      const catalogTerm = catalog.terms.find((item) => terms.key(scope.year, item.key) === key);
+      options.set(key, {
+        year: String(scope.year),
+        term: String(catalogTerm ? catalogTerm.key : scope.term),
+        name: scope.name || options.get(key)?.name,
+      });
+    }
+
+    const { years, terms: sessions, defaultYear, defaultTerm } = catalog;
+    years.forEach(({ key: year }) => sessions.forEach(({ key: term }) => add({ year, term })));
+    add({ year: defaultYear, term: defaultTerm });
+    add(current);
+    appointments.periods.forEach((period) => add(terms.appointmentTerm(period)));
+    entries.forEach(({ row }) => add(terms.courseTerm(row)));
+    plans.list().forEach((plan) => plan.sections.forEach(add));
+    add(selectedTerm);
+    return [...options.values()].sort((a, b) => terms.compare(b, a, catalog));
+  }
+
+  function defaultTerm(options, { appointments, catalog }, current, now) {
+    const open = terms.openPeriod(appointments, catalog, now);
+    const active = open && terms.appointmentTerm(open);
+    const preferred = active && (!current || terms.compare(active, current, catalog) >= 0) ? active : current;
+    return options.find((scope) => scopeKey(scope) === scopeKey(preferred)) ||
+      options.find((scope) => scopeKey(scope) === terms.key(catalog.defaultYear, catalog.defaultTerm)) ||
+      options[0] || null;
+  }
+
+  function setTerm(scope) {
+    if (scopeKey(scope) === scopeKey(selectedTerm) && scope?.term === selectedTerm?.term) return;
+    selectedTerm = scope;
+    publishItems(null);
+    window.dispatchEvent(new CustomEvent(TERM_EVENT));
+  }
+
+  function selectTerm(scope) {
+    if (!scopeKey(scope)) return;
+    manualTerm = true;
+    setTerm(availableTerms.find((option) => scopeKey(option) === scopeKey(scope)) || scope);
+    apply();
+  }
+
+  function termControls() {
+    const select = new modules.Select({
+      selectedKey: scopeKey(selectedTerm),
+      items: availableTerms.map((scope) => new modules.Item({
+        key: scopeKey(scope), text: terms.label(scope, termData.catalog),
+      })),
+      change: (event) => {
+        const key = event.getSource().getSelectedKey();
+        selectTerm(availableTerms.find((scope) => scopeKey(scope) === key));
+      },
+    });
+    const label = new modules.Label({ text: "Quarter", labelFor: select });
+    return new modules.HBox({ renderType: "Bare", alignItems: "Center", items: [label, select] })
+      .addStyleClass("tssreg-cal-quarter");
+  }
+
   function exportTitle() {
-    if (mode === MODE_FINALS) return "Final Exams";
     const plan = plans.current();
-    return plan ? plan.name : "";
+    const title = mode === MODE_FINALS ? "Final Exams" : plan && plan.name;
+    const quarter = selectedTerm && terms.label(selectedTerm, termData.catalog);
+    return [title, quarter].filter(Boolean).join(" – ");
   }
 
   function exportModel() {
@@ -1177,6 +1261,7 @@
     const bar = new modules.HBox({ renderType: "Bare", alignItems: "Center", wrap: "Wrap" });
     bar.addStyleClass("tssreg-cal-toolbar");
     bar.addItem(buildTabs());
+    if (selectedTerm) bar.addItem(termControls());
     bar.addItem(planControls());
     if (mode === MODE_SCHEDULE) bar.addItem(addEventButton());
     bar.addItem(legendControl(items));
@@ -1296,7 +1381,8 @@
     window.dispatchEvent(new CustomEvent(ITEMS_EVENT));
   }
 
-  function busyIntervals() {
+  function busyIntervals(year, term) {
+    if (year && term && terms.key(year, term) !== scopeKey(selectedTerm)) return null;
     if (!publishedItems) return null;
     const byDay = {};
     publishedItems.forEach((item) => {
@@ -1313,6 +1399,8 @@
   function signatureOf(items) {
     return JSON.stringify([
       mode,
+      scopeKey(selectedTerm),
+      availableTerms.map(scopeKey),
       plans.signature(),
       events.signature(),
       items.map((item) => [
@@ -1346,11 +1434,11 @@
         ],
       });
       box.addStyleClass("tssreg-cal-loading");
-    } else {
+    } else if (box.getItems()[0].getText() !== text) {
       box.getItems()[0].setText(text);
     }
     box.getItems()[1].setPercentValue(total ? Math.round((loaded / total) * 100) : 0);
-    coursesPage.mountAfterList(page, list, box, FINDER_ID);
+    coursesPage.mountAfterList(page, list, box, ROOT_ID);
   }
 
   function buildTabs() {
@@ -1410,6 +1498,7 @@
 
   function teardown() {
     abortReads();
+    termRequest = null;
     publishItems(null);
     removeLoading();
     destroyCalendar();
@@ -1426,32 +1515,59 @@
     const list = page && listControl(page);
     if (!list) return;
 
+    loadTermData();
     const entries = moduleEntries(list);
     if (!entries) return void publishItems(null);
 
-    ensureEvents(entries);
-    ensureMeetings(entries);
+    if (!termData) return;
+    const now = Date.now();
+    const current = terms.currentTerm(termData.catalog, now);
+    availableTerms = termOptions(entries, termData, current);
+    if (!manualTerm) setTerm(defaultTerm(availableTerms, termData, current, now));
+
+    const termKey = scopeKey(selectedTerm);
+    const scoped = termKey ? entries.filter(({ row }) => terms.key(row.AcademicYear, row.AcademicSession) === termKey) : [];
     const planned = planSections();
-    const total = entries.length + planned.length;
+    ensureEvents(scoped);
+    ensureMeetings(scoped, planned);
+    const total = scoped.length + planned.length;
     const loaded =
-      entries.filter(({ row }) => eventsByPackage[row.EventPackageId] && modulesLoaded[moduleKey(row)]).length +
+      scoped.filter(({ path, row }) => eventsByPath[path] && modulesLoaded[moduleKey(row)]).length +
       planned.filter((section) => modulesLoaded[planModuleKey(section)]).length;
+    const root = calendarRoot();
+    if (!selectedTerm) {
+      if (rendered !== "no terms") {
+        const message = labelled("No academic quarters are available.", "tssreg-cal-empty");
+        swapContent(root, [message]);
+        rendered = "no terms";
+      }
+      setNativeListHidden(list, false);
+      coursesPage.mountAfterList(page, list, root, FINDER_ID);
+      return;
+    }
     if (loaded < total) {
       setNativeListHidden(list, true);
       publishItems(null);
+      const signature = JSON.stringify(["loading", mode, termKey, availableTerms.map(scopeKey), plans.signature()]);
+      if (signature !== rendered) {
+        closePopover();
+        layout = null;
+        swapContent(root, [buildChrome([])]);
+        rendered = signature;
+      }
+      coursesPage.mountAfterList(page, list, root, FINDER_ID);
       return void showLoading(page, list, loaded, total);
     }
     removeLoading();
 
-    const scheduled = scheduleItems(entries).concat(plannedItems()).concat(eventItems());
+    const scheduled = scheduleItems(scoped).concat(plannedItems(planned), eventItems());
     publishItems(scheduled);
     setNativeListHidden(list, true);
 
-    const showing = mode === MODE_FINALS ? finalsItems(entries).concat(plannedFinalsItems()) : scheduled;
+    const showing = mode === MODE_FINALS ? finalsItems(scoped).concat(plannedFinalsItems(planned)) : scheduled;
     dayDates = mode === MODE_FINALS && showing.length ? finalsDayDates(showing) : null;
 
     const signature = signatureOf(showing);
-    const root = calendarRoot();
     if (signature !== rendered || !root.getItems().length) {
       closePopover();
       swapContent(root, showing.length || mode === MODE_SCHEDULE ? buildCalendar(showing) : buildEmpty());
@@ -1460,7 +1576,7 @@
     coursesPage.mountAfterList(page, list, root, FINDER_ID);
   }
 
-  window.__tssregShared.schedule = { ITEMS_EVENT, items: () => publishedItems, busyIntervals };
+  window.__tssregShared.schedule = { ITEMS_EVENT, TERM_EVENT, items: () => publishedItems, term: () => selectedTerm, selectTerm, busyIntervals };
 
   window.__tssregShared.onUiUpdated(apply);
   window.addEventListener(plans.CHANGE_EVENT, apply);

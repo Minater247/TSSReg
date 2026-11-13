@@ -53,6 +53,7 @@
     help: { departments: [], buildings: [], modalities: [] },
     credits: { min: catalog.UNITS_MIN, max: catalog.UNITS_MAX },
     instructors: null,
+    instructorsPending: false,
     f: {
       q: "",
       dept: "",
@@ -75,6 +76,7 @@
   let modules = null;
   let ui = null;
   let searchToken = 0;
+  let termToken = 0;
   let refreshPending = false;
 
   window.__tssregShared.whenSapReady(() => {
@@ -222,18 +224,22 @@
   }
 
   function ensureSections(ids) {
+    const token = termToken;
     const missing = ids.filter((id) => id && !sectionsByModule[id] && !fetching[id]);
     if (!missing.length) return;
     missing.forEach((id) => (fetching[id] = true));
     catalog
       .fetchSections(missing, state.year, state.term)
       .then((byModule) => {
+        if (token !== termToken) return;
         missing.forEach((id) => (sectionsByModule[id] = byModule[id] || []));
       })
       .catch(() => {
+        if (token !== termToken) return;
         missing.forEach((id) => (sectionsByModule[id] = []));
       })
       .then(() => {
+        if (token !== termToken) return;
         missing.forEach((id) => delete fetching[id]);
         refreshResults();
       });
@@ -338,7 +344,7 @@
   }
 
   function planButton(course, pkg) {
-    const added = plans.hasSection(pkg.moduleId, pkg.pkgId);
+    const added = plans.hasSection(pkg.moduleId, pkg.pkgId, state.year, state.term);
     return new modules.Button({
       text: added ? "Unplan" : "Plan",
       type: added ? "Transparent" : "Emphasized",
@@ -467,7 +473,7 @@
       ];
     }
 
-    const busy = state.f.conflictMode ? schedule.busyIntervals() : null;
+    const busy = state.f.conflictMode ? schedule.busyIntervals(state.year, state.term) : null;
     if (state.f.conflictMode && !busy) return [busyBox("Waiting for your enrolled courses…")];
 
     const groups = state.results
@@ -509,8 +515,7 @@
       items: optionItems(state.years),
       selectedKey: state.year,
       change: (event) => {
-        state.year = event.getParameter("selectedItem").getKey();
-        onTermChanged();
+        schedule.selectTerm({ year: event.getParameter("selectedItem").getKey(), term: state.term });
       },
     });
 
@@ -519,8 +524,7 @@
       items: optionItems(state.terms),
       selectedKey: state.term,
       change: (event) => {
-        state.term = event.getParameter("selectedItem").getKey();
-        onTermChanged();
+        schedule.selectTerm({ year: state.year, term: event.getParameter("selectedItem").getKey() });
       },
     });
 
@@ -545,7 +549,7 @@
         researchIfShowing();
       },
     });
-    ui.instructor.attachBrowserEvent("focusin", loadInstructors);
+    loadInstructors();
 
     return [
       field(" ", ui.query, "Subject and number, or part of a title"),
@@ -592,8 +596,12 @@
   }
 
   function loadInstructors() {
-    if (state.instructors || !state.year || !state.term) return;
+    if (state.instructors || state.instructorsPending || !state.year || !state.term) return;
+    const token = termToken;
+    state.instructorsPending = true;
     catalog.loadInstructors(state.year, state.term).then((rows) => {
+      if (token !== termToken) return;
+      state.instructorsPending = false;
       state.instructors = rows;
       if (!ui || !ui.instructor) return;
       ui.instructor.destroyItems();
@@ -729,12 +737,27 @@
   }
 
   function onTermChanged() {
+    const scope = schedule.term();
+    if (!scope || (state.year === scope.year && state.term === scope.term)) return;
+    state.year = scope.year;
+    state.term = scope.term;
+    termToken += 1;
+    searchToken += 1;
+    state.loading = false;
+    state.busy = false;
     state.ready = false;
     state.instructors = null;
+    state.instructorsPending = false;
+    state.f.dept = "";
+    state.f.instructor = "";
+    state.f.buildings = {};
+    state.f.modality = "";
     state.results = [];
     state.searched = false;
     Object.keys(sectionsByModule).forEach((id) => delete sectionsByModule[id]);
-    Promise.resolve().then(loadCatalog);
+    Object.keys(fetching).forEach((id) => delete fetching[id]);
+    Object.keys(expanded).forEach((id) => delete expanded[id]);
+    if (ui && state.open) loadCatalog();
   }
 
   function loadCatalog() {
@@ -742,32 +765,44 @@
     state.loading = true;
     state.catalogError = "";
     renderPanel();
-    const seed = state.year && state.term
-      ? Promise.resolve({ years: state.years, terms: state.terms, defaultYear: state.year, defaultTerm: state.term })
-      : catalog.loadTerms();
-    seed
+    const token = termToken;
+    catalog.loadTerms()
       .then((terms) => {
+        if (token !== termToken) return;
         state.years = terms.years;
         state.terms = terms.terms;
-        if (!state.year) state.year = terms.defaultYear;
-        if (!state.term) state.term = terms.defaultTerm;
+        if (!state.year || !state.term) {
+          state.loading = false;
+          if (!terms.years.length || !terms.terms.length) {
+            state.catalogError = "Could not load academic quarters.";
+            renderPanel();
+          }
+          return;
+        }
+        if (!state.years.some((item) => item.key === state.year)) {
+          state.years = state.years.concat({ key: state.year, text: state.year });
+        }
+        if (!state.terms.some((item) => item.key === state.term)) {
+          state.terms = state.terms.concat({ key: state.term, text: schedule.term().name || state.term });
+        }
         return Promise.all([
           catalog.loadValueHelps(state.year, state.term),
           catalog.loadCreditRange(state.year, state.term),
         ]);
       })
-      .then(([help, credits]) => {
+      .then((loaded) => {
+        if (token !== termToken || !loaded) return;
+        const [help, credits] = loaded;
         state.help = help;
-        if (state.f.unitsMin === state.credits.min && state.f.unitsMax === state.credits.max) {
-          state.f.unitsMin = credits.min;
-          state.f.unitsMax = credits.max;
-        }
+        state.f.unitsMin = credits.min;
+        state.f.unitsMax = credits.max;
         state.credits = credits;
         state.loading = false;
         state.ready = true;
         renderPanel();
       })
       .catch((error) => {
+        if (token !== termToken) return;
         state.loading = false;
         state.catalogError = "Could not load the course catalog (" + error.message + ").";
         renderPanel();
@@ -777,6 +812,7 @@
   function renderPanel() {
     if (!ui || !ui.panel) return;
     ui.panel.destroyContent();
+    ui.results = null;
     if (state.catalogError) return void ui.panel.addContent(message(state.catalogError, true));
     if (!state.ready) return void ui.panel.addContent(busyBox("Loading the course catalog…"));
 
@@ -817,6 +853,7 @@
     const page = pageControl();
     const list = page && listControl(page);
     if (!list) return;
+    onTermChanged();
 
     let root = sap.ui.getCore().byId(ROOT_ID);
     if (!root || !ui) {
@@ -829,4 +866,5 @@
   window.__tssregShared.onUiUpdated(apply);
   window.addEventListener(plans.CHANGE_EVENT, refreshResults);
   window.addEventListener(schedule.ITEMS_EVENT, refreshResults);
+  window.addEventListener(schedule.TERM_EVENT, onTermChanged);
 })();

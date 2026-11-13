@@ -22,6 +22,10 @@
   justify-content: space-between;
 }
 
+.tssreg-cal .tssreg-cal-quarter {
+  gap: 8px;
+}
+
 .tssreg-cal .tssreg-cal-legend {
   gap: 16px;
 }

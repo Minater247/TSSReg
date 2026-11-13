@@ -20,6 +20,7 @@
   ];
 
   let modules = null;
+  let rooms = null;
   let byDay = null;
   let legend = [];
   let fetchStarted = false;
@@ -83,6 +84,65 @@
     return dayKey(date.getFullYear(), date.getMonth(), date.getDate());
   }
 
+  function eventKey(id) {
+    return String(id || "").replace(/^E\s*/, "").replace(/^0+/, "");
+  }
+
+  function placeFrom(schedule) {
+    const match = /@\s*([^\n]+)/.exec(String(schedule || ""));
+    return match ? match[1].trim() : "";
+  }
+
+  function moduleQuery(entity, ids, select) {
+    const clause = ids.map((id) => "ModuleID eq " + shared.odataLiteral(id)).join(" or ");
+    return (
+      shared.serviceUrl(entity) +
+      "?" + shared.CLIENT +
+      "&$top=" + shared.ROW_LIMIT +
+      (select ? "&$select=" + select : "") +
+      "&$filter=" + encodeURIComponent(clause)
+    );
+  }
+
+  function loadRooms(rows) {
+    const catalog = shared.catalog;
+    const ids = [
+      ...new Set(
+        rows.filter((row) => row.EventType === CLASS_EVENT_TYPE).map((row) => row.ModuleId).filter(Boolean)
+      ),
+    ];
+    if (!catalog || !ids.length) {
+      rooms = {};
+      return Promise.resolve();
+    }
+    const parts = shared.chunk(ids, shared.ID_CHUNK_SIZE);
+    return Promise.all([
+      Promise.all(parts.map((part) => shared.fetchJson(moduleQuery("YUCSD_CON_EVENTS", part, "ModuleID,EventID,Sched")))),
+      Promise.all(parts.map((part) => shared.fetchJson(moduleQuery("YUCSD_CON_MODULE_BLDG", part, "")))),
+    ])
+      .then(([eventPages, hallPages]) => {
+        const codes = {};
+        hallPages.forEach((page) =>
+          ((page && page.value) || []).forEach((row) => {
+            if (row.BuildingText && row.BuildingID) codes[row.BuildingText] = row.BuildingID;
+          })
+        );
+        const found = {};
+        eventPages.forEach((page) =>
+          ((page && page.value) || []).forEach((row) => {
+            const place = catalog.roomParts(placeFrom(row.Sched), codes);
+            if (place && place.coded) {
+              found[eventKey(row.EventID)] = place.number ? place.code + " " + place.number : place.code;
+            }
+          })
+        );
+        rooms = found;
+      })
+      .catch(() => {
+        rooms = {};
+      });
+  }
+
   function groupByDay(rows) {
     const grouped = {};
     rows.forEach((row) => {
@@ -97,6 +157,7 @@
         sortMinutes: start.hours * 60 + start.minutes,
         time: isClass ? formatRange(start, end) : "",
         name: row.CourseName || row.EventName,
+        eventId: eventKey(row.EventId),
         room: (row.Room || "").split(" - ")[0].trim(),
         color: safeColor(row.EventCssColor),
       });
@@ -123,11 +184,24 @@
     fetch(EVENTS_URL, options)
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        byDay = groupByDay((data && data.d && data.d.results) || []);
+        const rows = (data && data.d && data.d.results) || [];
+        byDay = groupByDay(rows);
+        return loadRooms(rows);
       })
       .catch(() => {
         byDay = {};
-      });
+        rooms = {};
+      })
+      .then(refreshStrip);
+  }
+
+  function dataReady() {
+    return !!(byDay && rooms);
+  }
+
+  function refreshStrip() {
+    const strip = sap.ui.getCore().byId(STRIP_ID);
+    if (strip) renderStrip(strip);
   }
 
   function weekDays(offset) {
@@ -167,6 +241,10 @@
       dom.style.setProperty(name, value);
     });
   }
+  function roomLabel(event) {
+    return (rooms && rooms[event.eventId]) || event.room;
+  }
+
   function eventBox(event) {
     if (!event.isClass) {
       const badge = labelled(event.name, "tssreg-week-badge", "Center");
@@ -182,7 +260,7 @@
       items: [
         event.time && labelled(event.time, "tssreg-week-time"),
         labelled(event.name, "tssreg-week-name"),
-        event.room && labelled(event.room, "tssreg-week-room"),
+        roomLabel(event) && labelled(roomLabel(event), "tssreg-week-room"),
       ].filter(Boolean),
     });
     box.addStyleClass("tssreg-week-event");
@@ -200,7 +278,7 @@
         "Center"
       )
     );
-    (byDay[localKey(day)] || []).forEach((event) => box.addItem(eventBox(event)));
+    ((byDay && byDay[localKey(day)]) || []).forEach((event) => box.addItem(eventBox(event)));
     return box;
   }
 
@@ -272,6 +350,10 @@
     days.forEach((day) => grid.addItem(dayBox(day, today)));
     const scroll = new modules.VBox({ renderType: "Bare", items: [grid] });
     scroll.addStyleClass("tssreg-week-scroll");
+    if (!dataReady()) {
+      scroll.addStyleClass("tssreg-week-loading");
+      scroll.addItem(labelled("Loading…", "tssreg-week-loading-label", "Center"));
+    }
     strip.addItem(scroll);
 
     const footer = new modules.HBox({ renderType: "Bare" });
@@ -318,7 +400,6 @@
   function apply() {
     if (!shared.isOverviewRoute() || !modules) return;
     ensureData();
-    if (!byDay) return;
 
     const cardEl = shared.cardElement(CARD);
     if (cardEl) retargetHeader(cardEl);

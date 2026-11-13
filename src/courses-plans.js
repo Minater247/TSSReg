@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "tssreg-course-plans";
   const CHANGE_EVENT = "tssreg:plans-changed";
+  const terms = window.__tssregShared.academicTerms;
 
   let state = { currentPlanId: null, list: [] };
 
@@ -132,13 +133,14 @@
     announce();
   }
 
-  function sameSection(section, moduleId, pkgId) {
-    return section.moduleId === String(moduleId) && section.pkgId === String(pkgId);
+  function sameSection(section, moduleId, pkgId, year, term) {
+    return section.moduleId === String(moduleId) && section.pkgId === String(pkgId) &&
+      terms.key(section.year, section.term) === terms.key(year, term);
   }
 
-  function hasSection(moduleId, pkgId) {
+  function hasSection(moduleId, pkgId, year, term) {
     const plan = current();
-    return !!(plan && plan.sections.some((section) => sameSection(section, moduleId, pkgId)));
+    return !!(plan && plan.sections.some((section) => sameSection(section, moduleId, pkgId, year, term)));
   }
 
   function addSection(rawSection) {
@@ -146,23 +148,23 @@
     if (!section) return null;
     let plan = current();
     if (!plan) plan = create(defaultName());
-    if (plan.sections.some((entry) => sameSection(entry, section.moduleId, section.pkgId))) return plan;
+    if (plan.sections.some((entry) => sameSection(entry, section.moduleId, section.pkgId, section.year, section.term))) return plan;
     plan.sections.push(section);
     announce();
     return plan;
   }
 
-  function removeSection(moduleId, pkgId) {
+  function removeSection(moduleId, pkgId, year, term) {
     const plan = current();
     if (!plan) return;
     const before = plan.sections.length;
-    plan.sections = plan.sections.filter((section) => !sameSection(section, moduleId, pkgId));
+    plan.sections = plan.sections.filter((section) => !sameSection(section, moduleId, pkgId, year, term));
     if (plan.sections.length !== before) announce();
   }
 
   function toggleSection(section) {
-    if (section && hasSection(section.moduleId, section.pkgId)) {
-      removeSection(section.moduleId, section.pkgId);
+    if (section && hasSection(section.moduleId, section.pkgId, section.year, section.term)) {
+      removeSection(section.moduleId, section.pkgId, section.year, section.term);
       return false;
     }
     addSection(section);

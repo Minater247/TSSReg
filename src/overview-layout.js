@@ -20,7 +20,7 @@
       title: "Enrollment",
       texts: [
         "My Appointment Times",
-        "TGPT-Class Planner",
+        "Class Planner",
         "My Holds",
         "Course Catalog",
         "Triton Enrollment Authorization",
@@ -55,7 +55,7 @@
         "Academic History",
         "Degree Audit",
         "Order Transcripts",
-        "TGPT-Class Planner",
+        "Class Planner",
         "Canvas",
         "Extended Studies Canvas",
       ],
@@ -80,7 +80,9 @@
     },
   ];
 
+  const sources = new Map();
   let cache = null;
+  let renderedMore = null;
   let modules = null;
 
   window.__tssregShared.whenSapReady(() => {
@@ -96,6 +98,7 @@
       ],
       (JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid) => {
         modules = { JSONModel, StandardListItem, List, Panel, VBox, Text, CSSGrid };
+        apply();
       }
     );
   });
@@ -113,38 +116,54 @@
   }
 
   function normalizeText(value) {
-    return String(value || "")
+    const text = String(value || "")
       .replace(/[​-‍⁠﻿]/g, "")
       .trim();
+    if (text === "My Academic History") return "Academic History";
+    if (text === "TGPT-Class Planner") return "Class Planner";
+    return text;
   }
 
+  /** Collects available links as TSS finishes loading each card. */
   function harvest() {
-    if (cache) return true;
-    const links = [];
-    const seen = {};
-    for (let i = 0; i < LINK_CARDS.length; i++) {
-      const list = listControl(LINK_CARDS[i]);
-      if (!list || !boundEntitySet(list) || !list.getItems().length) return false;
-      list.getItems().forEach((item) => {
-        const context = item.getBindingContext();
+    let changed = false;
+    LINK_CARDS.forEach((card) => {
+      const list = listControl(card);
+      if (!boundEntitySet(list)) return;
+      const model = list.getBindingInfo("items").model;
+      const rows = list.getItems().flatMap((item) => {
+        const context = item.getBindingContext(model);
         const data = context && context.getObject();
-        if (!data || !data.Url || seen[data.Url]) return;
-        seen[data.Url] = true;
-        links.push({
+        if (!data || !data.Url) return [];
+        return [{
           text: normalizeText(data.Text),
           url: data.Url,
           icon: data.ImageUrl,
           newWindow: !!data.NewWindow,
-        });
+        }];
       });
-    }
+      if (!rows.length) return;
+      const signature = JSON.stringify(rows);
+      if (sources.get(card)?.signature === signature) return;
+      sources.set(card, { rows, signature });
+      changed = true;
+    });
+    if (!changed) return !!cache;
+
+    const links = [];
+    const seen = new Set();
+    LINK_CARDS.forEach((card) => sources.get(card)?.rows.forEach((link) => {
+      const key = JSON.stringify([link.text, link.url]);
+      if (seen.has(key)) return;
+      seen.add(key);
+      links.push(link);
+    }));
 
     const byText = {};
     links.forEach((link) => {
       if (!byText[link.text]) byText[link.text] = link;
     });
     const primary = PRIMARY.map((text) => byText[text]).filter(Boolean);
-    if (primary.length !== PRIMARY.length) return false;
 
     cache = { links, byText };
     shared.setOverviewPrimary(primary);
@@ -215,7 +234,14 @@
     const rows = config.texts.map((text) => cache.byText[text]).filter(Boolean);
     if (!rows.length) return;
     const info = list.getBindingInfo("items");
-    if (!info || info.path !== "/links") bindLinks(list, rows);
+    if (info?.model === MODEL_NAME && info.path === "/links") {
+      const model = list.getModel(MODEL_NAME);
+      if (JSON.stringify(model.getProperty("/links")) !== JSON.stringify(rows)) model.setProperty("/links", rows);
+    } else if (list.getItems().length && boundEntitySet(list)) {
+      bindLinks(list, rows);
+    } else {
+      return;
+    }
     applyCardTitle(config.card, config.title);
   }
 
@@ -258,11 +284,20 @@
   }
 
   function applyMore(inner) {
-    if (document.getElementById(PANEL_ID)) return;
     const groups = moreGroups();
     if (!groups.length) return;
-    const panel = sap.ui.getCore().byId(PANEL_ID) || buildMorePanel(groups);
-    panel.placeAt(mountMoreBand(inner));
+    const signature = JSON.stringify(groups);
+    let panel = sap.ui.getCore().byId(PANEL_ID);
+    if (panel && renderedMore !== signature) {
+      const expanded = panel.getExpanded();
+      panel.destroy();
+      panel = buildMorePanel(groups);
+      panel.setExpanded(expanded);
+    }
+    if (!panel) panel = buildMorePanel(groups);
+    renderedMore = signature;
+    const host = mountMoreBand(inner);
+    if (panel.getDomRef()?.parentElement !== host) panel.placeAt(host);
   }
 
   function disableDragAndDrop() {

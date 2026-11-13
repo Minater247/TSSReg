@@ -6,6 +6,7 @@ const PAGE_SRC = path.join(__dirname, "..", "src", "courses-page.js");
 const EXPORT_SRC = path.join(__dirname, "..", "src", "courses-export.js");
 const EVENTS_SRC = path.join(__dirname, "..", "src", "courses-events.js");
 const CATALOG_SRC = path.join(__dirname, "..", "src", "courses-catalog.js");
+const TERMS_SRC = path.join(__dirname, "..", "src", "academic-terms.js");
 
 function evaluate(file, win) {
   const src = fs.readFileSync(file, "utf8");
@@ -28,7 +29,7 @@ function loadCalendar() {
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   const exposed =
     body +
-    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, eventsByPackage, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel };";
+    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel, planSections, setTerm, termOptions, defaultTerm, terms };";
 
   const plain = (value) => String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
   const win = {
@@ -52,6 +53,7 @@ function loadCalendar() {
     dispatchEvent() {},
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   };
+  evaluate(TERMS_SRC, win);
   evaluate(PAGE_SRC, win);
   evaluate(CATALOG_SRC, win);
   Object.assign(win.__tssregShared.catalog, {
@@ -246,9 +248,13 @@ check(
   ["far", "a"]
 );
 
-check("time range rounds out to whole hours", cal.timeRange([block(545, 605, "a")]), {
-  startMin: 540,
-  endMin: 660,
+check("an afternoon class leaves the full morning visible and rounds its end up", cal.timeRange([block(875, 955, "a")]), {
+  startMin: 480,
+  endMin: 960,
+});
+check("early and late meetings extend the time range", cal.timeRange([block(450, 480), block(1170, 1250)]), {
+  startMin: 420,
+  endMin: 1260,
 });
 check("time range has a default", cal.timeRange([]), { startMin: 480, endMin: 1020 });
 check("weekdays always show", cal.daysToShow([]), ["MO", "TU", "WE", "TH", "FR"]);
@@ -280,6 +286,58 @@ cal.publishItems([]);
 check("an empty schedule is known, not unknown", cal.busyIntervals(), {});
 cal.publishItems(null);
 check("loading resets busy to unknown", cal.busyIntervals(), null);
+cal.setTerm({ year: "2026", term: "2" });
+
+// ---------- academic sessions and booking windows ----------
+const { terms } = cal;
+const catalogTerms = {
+  years: [{ key: "2026", text: "2026/2027" }],
+  terms: [{ key: "2", text: "Fall Quarter" }, { key: "3", text: "Winter Quarter" }, { key: "4", text: "Spring Quarter" }],
+  defaultYear: "2026",
+  defaultTerm: "2",
+};
+const now = Date.parse("2026-11-13T00:00:00Z");
+const periods = ["002", "003", "004"].map((academicSession) => ({
+  academicYear: "2026", academicSession, calendarId: "UN", bkgWindow: "CONT",
+}));
+const times = periods.map(({ academicSession }) => ({
+  academicYear: "2026", academicSession, calendarId: "UN", bkgWindow: "CONT", timelimitStatus: "A",
+  beginTimestamp: "2026-11-12T23:00:00Z", endTimestamp: "2026-11-15T07:59:00Z",
+}));
+check("the nearest upcoming quarter wins even when other passes are open", terms.openPeriod({ periods, times }, catalogTerms, now), periods[1]);
+check("an expired active window and another booking group cannot make Winter the default", terms.openPeriod({
+  periods,
+  times: [times[0], { ...times[1], endTimestamp: "2026-11-12T23:59:00Z" }, { ...times[1], bkgWindow: "NEW" }],
+}, catalogTerms, now), periods[0]);
+check("a future or ambiguous window cannot make Winter the default", terms.openPeriod({
+  periods,
+  times: [{ ...times[1], beginTimestamp: "2026-11-13T01:00:00Z" }, { ...times[1], academicSession: "" }],
+}, catalogTerms, now), null);
+check("the current quarter is Fall even during Winter booking", terms.currentTerm(catalogTerms, now), { year: "2026", term: "2" });
+const current = terms.currentTerm(catalogTerms, now);
+const termData = { catalog: catalogTerms, appointments: { periods, times } };
+const options = cal.termOptions([], termData, current);
+check("Winter can be selected before any Winter courses are booked", options.map(({ term }) => term), ["4", "3", "2"]);
+check("the calendar defaults to Winter with an open Winter pass", cal.defaultTerm(options, termData, current, now).term, "3");
+check("the calendar falls back to Fall when no passes are open", cal.defaultTerm(options, {
+  ...termData, appointments: { periods, times: [] },
+}, current, now).term, "2");
+check("January uses the winter session of the same academic year", terms.currentTerm(catalogTerms, Date.parse("2027-01-08T20:00:00Z")), { year: "2026", term: "3" });
+check("the Winter selector uses the calendar year", terms.label(terms.appointmentTerm(periods[1]), catalogTerms), "Winter Quarter 2027");
+check("the count requires both academic year and session, including across padding differences", terms.coursesFor([
+  { AcademicYear: "2026", AcademicSession: "003", Credits: "4.5" },
+  { AcademicYear: "2026", AcademicSession: "002", Credits: "4" },
+  { AcademicYear: "2025", AcademicSession: "003", Credits: "2" },
+  { AcademicSession: "003", Credits: "1" },
+], { year: "2026", term: "3" }).map((row) => row.Credits), ["4.5"]);
+cal.publishItems([{ key: "fall", day: "MO", startMin: 540, endMin: 600 }]);
+check("winter searches cannot use fall meeting times", cal.busyIntervals("2026", "3"), null);
+check("matching sessions accept zero-padded codes", cal.busyIntervals("2026", "002"), {
+  MO: [{ startMin: 540, endMin: 600, pkgId: null }],
+});
+cal.setTerm({ year: "2026", term: "3" });
+check("switching quarters clears fall intervals before winter meetings load", cal.busyIntervals("2026", "003"), null);
+cal.setTerm({ year: "2026", term: "2" });
 
 check(
   "the legend lists only the statuses on the calendar",
@@ -362,6 +420,8 @@ function enrolledRow(fields) {
   return Object.assign(
     {
       EventPackageId: "00154645",
+      AcademicYear: "2026",
+      AcademicSession: "002",
       SmObjid: "0009462",
       SmShort: "CSE-123",
       SmStext: "Computer Networks",
@@ -387,7 +447,7 @@ function finalRecord(fields) {
   );
 }
 
-cal.finalsByPackage["9462|154645"] = finalRecord({});
+cal.finalsByPackage["2026|2|9462|154645"] = finalRecord({});
 const withFinal = cal.finalsItems([{ row: enrolledRow({}) }]);
 
 check("an enrolled course with an exam is drawn once", withFinal.length, 1);
@@ -420,7 +480,7 @@ check(
 );
 
 // ---------- exam rooms ----------
-cal.finalsByPackage["9462|154646"] = finalRecord({ pkgId: "154646", room: "" });
+cal.finalsByPackage["2026|2|9462|154646"] = finalRecord({ pkgId: "154646", room: "" });
 const noRoom = cal.finalsItems([{ row: enrolledRow({ EventPackageId: "00154646" }) }]);
 check("an unpublished room says so on the block", noRoom[0].room, "Room TBA");
 check("an unpublished room says so in the detail", noRoom[0].roomFull, "Room not posted yet");
@@ -488,7 +548,7 @@ check(
 check("no room text yields no labels", cal.roomLabels(""), null);
 
 // ---------- final exams for planned courses ----------
-cal.finalsByPackage["9604|154999"] = {
+cal.finalsByPackage["2026|2|9604|154999"] = {
   moduleId: "9604",
   pkgId: "154999",
   date: new Date(Date.UTC(2026, 11, 10)),
@@ -522,7 +582,9 @@ currentPlan = {
   ],
 };
 
-const plannedFinals = cal.plannedFinalsItems();
+currentPlan.sections.push({ ...currentPlan.sections[0], term: "003" });
+check("only sections from the selected quarter count toward the schedule", cal.planSections().length, 2);
+const plannedFinals = cal.plannedFinalsItems(cal.planSections());
 check("only planned courses that actually hold a final are drawn", plannedFinals.length, 1);
 check(
   "a planned final lands on its own date at its own time",
@@ -557,7 +619,7 @@ check(
 );
 
 currentPlan = null;
-check("with no schedule chosen there are no planned finals", cal.plannedFinalsItems(), []);
+check("with no schedule chosen there are no planned finals", cal.plannedFinalsItems(cal.planSections()), []);
 
 // ---------- rooms on planned classes ----------
 currentPlan = {
@@ -582,7 +644,7 @@ currentPlan = {
   ],
 };
 
-const plannedClass = cal.plannedItems();
+const plannedClass = cal.plannedItems(cal.planSections());
 check("a planned class shortens its room like an enrolled one", plannedClass[0].room, "FAH 1301");
 check("the planned room keeps its number for the detail", plannedClass[0].roomFull, "FAH - 1301");
 
