@@ -9,14 +9,14 @@ const CATALOG_SRC = path.join(__dirname, "..", "src", "courses-catalog.js");
 const TERMS_SRC = path.join(__dirname, "..", "src", "academic-terms.js");
 const FINDER_SRC = path.join(__dirname, "..", "src", "courses-finder.js");
 
-function evaluate(file, win) {
+function evaluate(file, win, location = { hash: "" }) {
   const src = fs.readFileSync(file, "utf8");
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   new Function("window", "sap", "document", "location", "URL", "setTimeout", body)(
     win,
     null,
     { createElement: () => ({ getContext: () => null }), fonts: null },
-    { hash: "" },
+    location,
     {},
     () => {}
   );
@@ -30,7 +30,7 @@ function loadCalendar() {
   const body = src.replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
   const exposed =
     body +
-    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, enrolledRoute, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, buildings, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel, planSections, setTerm, termOptions, defaultTerm, terms };";
+    "\n;return { layoutDay, overlapClusters, timeRange, daysToShow, statusOf, minutesOf, busyIntervals, publishItems, enrolledRoute, legendModel, meetingsFor, meetingsBySection, coursesPage, swapContent, onRootRendered, finalsItems, plannedItems, buildingsByTerm, roomLabels, finalsWeek, finalsDayDates, dateKey, plannedFinalsItems, finalsByPackage, eventItems, events, scopeOptions, scopeLabel, planSections, setTerm, termOptions, defaultTerm, terms, catalog, preloadOtherTerms, ensureEvents, ensureMeetings, abortReads };";
 
   const plain = (value) => String(value == null ? "" : value).replace(/^0+(?=\d)/, "");
   const win = {
@@ -54,8 +54,9 @@ function loadCalendar() {
     dispatchEvent() {},
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   };
+  const location = { hash: "" };
   evaluate(TERMS_SRC, win);
-  evaluate(PAGE_SRC, win);
+  evaluate(PAGE_SRC, win, location);
   evaluate(CATALOG_SRC, win);
   Object.assign(win.__tssregShared.catalog, {
     plainId: plain,
@@ -65,7 +66,6 @@ function loadCalendar() {
   });
   evaluate(EXPORT_SRC, win);
   evaluate(EVENTS_SRC, win);
-  const location = { hash: "" };
   const sap = { ui: { require() {}, getCore: () => ({ byId: () => null }) } };
   const doc = { querySelector: () => null };
   const CustomEvent = function (type) {
@@ -271,15 +271,15 @@ check(
   ["far", "a"]
 );
 
-check("an afternoon class leaves the full morning visible and rounds its end up", cal.timeRange([block(875, 955, "a")]), {
+check("an afternoon class leaves the full morning and evening visible", cal.timeRange([block(875, 955, "a")]), {
   startMin: 480,
-  endMin: 960,
-});
-check("early and late meetings extend the time range", cal.timeRange([block(450, 480), block(1170, 1250)]), {
-  startMin: 420,
   endMin: 1260,
 });
-check("time range has a default", cal.timeRange([]), { startMin: 480, endMin: 1020 });
+check("early and late meetings extend the time range", cal.timeRange([block(450, 480), block(1170, 1290)]), {
+  startMin: 420,
+  endMin: 1320,
+});
+check("an empty calendar shows 8 AM to 9 PM", cal.timeRange([]), { startMin: 480, endMin: 1260 });
 check("weekdays always show", cal.daysToShow([]), ["MO", "TU", "WE", "TH", "FR"]);
 check(
   "a saturday block adds saturday",
@@ -470,8 +470,7 @@ check(
 );
 
 // ---------- final exams ----------
-cal.buildings["Center Hall"] = "CENTR";
-cal.buildings["Franklin Antonio Hall"] = "FAH";
+cal.buildingsByTerm["2026|2"] = { "Center Hall": "CENTR", "Franklin Antonio Hall": "FAH" };
 
 function enrolledRow(fields) {
   return Object.assign(
@@ -882,6 +881,69 @@ currentPlan = null;
 cal.events.list().slice().forEach((record) => cal.events.remove(record.id));
 check("removing every event clears the calendar of them", cal.eventItems(), []);
 
-console.log(passed + " passed, " + failures.length + " failed");
-failures.forEach((line) => console.log("  FAIL " + line));
-process.exit(failures.length ? 1 : 0);
+async function checkPreloading() {
+  const calendar = loadCalendar();
+  calendar.location.hash = "#ZUSModule-display&/MyModules";
+  const winter = { year: "2026", term: "3" };
+  const fall = { year: "2026", term: "2" };
+  const spring = { year: "2026", term: "4" };
+  const empty = { year: "2025", term: "2" };
+  const requests = [];
+  const reads = [];
+  let resolveFall;
+  calendar.catalog.loadMeetings = (ids, year, term) => {
+    requests.push([term, ids]);
+    if (term === "2" && !resolveFall) return new Promise((resolve) => { resolveFall = resolve; });
+    return Promise.resolve({});
+  };
+  calendar.catalog.loadFinals = () => Promise.resolve([]);
+  calendar.catalog.loadBuildings = () => Promise.resolve({});
+  const entries = [{
+    path: "/fall",
+    row: enrolledRow({ AcademicSession: "002" }),
+    model: { read: (path, handlers) => { reads.push(handlers); return {}; } },
+  }];
+  allPlans = [{ sections: [{ ...spring, moduleId: "12" }] }];
+  const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const options = [winter, fall, empty, spring];
+
+  calendar.setTerm(winter);
+  calendar.preloadOtherTerms(entries, options);
+  check("preloads start in the background", requests, []);
+  await nextTick();
+  check("only one other quarter starts and its catalog term is used", requests, [["2", ["9462"]]]);
+  check("the preload reads booked course events", reads.length, 1);
+  calendar.preloadOtherTerms(entries, options);
+  await nextTick();
+  check("the next preload waits for the first one", requests.length, 1);
+
+  calendar.setTerm(fall);
+  calendar.ensureEvents(entries);
+  calendar.ensureMeetings(fall, entries, []);
+  check("selecting a quarter reuses in-flight preload requests", [requests.length, reads.length], [1, 1]);
+  resolveFall({});
+  reads[0].error();
+  await nextTick();
+  calendar.ensureEvents(entries);
+  calendar.ensureMeetings(fall, entries, []);
+  check("selecting a quarter retries a failed background event read", [requests.length, reads.length], [1, 2]);
+  reads[1]?.success({ results: [] });
+  calendar.preloadOtherTerms(entries, options);
+  await nextTick();
+  check("empty quarters are skipped and saved plans are preloaded", requests, [["2", ["9462"]], ["4", ["12"]]]);
+
+  allPlans.push({ sections: [{ ...empty, moduleId: "13" }] });
+  calendar.preloadOtherTerms(entries, options);
+  calendar.abortReads();
+  await nextTick();
+  check("leaving the calendar cancels a queued preload", requests.length, 2);
+}
+
+checkPreloading().then(() => {
+  console.log(passed + " passed, " + failures.length + " failed");
+  failures.forEach((line) => console.log("  FAIL " + line));
+  process.exitCode = failures.length ? 1 : 0;
+}).catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

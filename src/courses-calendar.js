@@ -42,12 +42,17 @@
   const eventsByPath = {};
   const meetingsBySection = {};
   const finalsByPackage = {};
-  const buildings = {};
+  const buildingsByTerm = {};
+  const buildingRequests = {};
   const inFlight = [];
   const retired = [];
   const modulesLoaded = {};
   const pending = {};
   const pendingModules = {};
+  const failedEventPreloads = new Set();
+  const failedModulePreloads = new Set();
+  let preloadTimer = null;
+  let preloading = null;
   let rendered = null;
   let layout = null;
   let openBlockKey = null;
@@ -122,6 +127,7 @@
   }
 
   function abortReads() {
+    cancelPreload();
     readEpoch += 1;
     inFlight.splice(0).forEach((entry) => {
       if (entry.handle && entry.handle.abort) entry.handle.abort();
@@ -129,9 +135,13 @@
     Object.keys(pending).forEach((key) => delete pending[key]);
   }
 
-  function ensureEvents(entries) {
+  function needsEvents(path, background) {
+    return !eventsByPath[path] && !pending[path] && !(background && failedEventPreloads.has(path));
+  }
+
+  function ensureEvents(entries, background = false) {
     entries.forEach(({ path, model }) => {
-      if (eventsByPath[path] || pending[path]) return;
+      if (!needsEvents(path, background)) return;
       pending[path] = true;
       const entry = { epoch: readEpoch };
       inFlight.push(entry);
@@ -147,7 +157,8 @@
           dropRead(entry);
           if (entry.epoch !== readEpoch) return;
           delete pending[path];
-          eventsByPath[path] = [];
+          if (background) failedEventPreloads.add(path);
+          else eventsByPath[path] = [];
           apply();
         },
       });
@@ -171,44 +182,87 @@
     return catalog.scheduleKey(section.year, section.term, section.moduleId, "");
   }
 
-  function collect(groups, year, term, moduleId, key) {
-    const id = catalog.plainId(moduleId);
-    if (!id || modulesLoaded[key] || pendingModules[key]) return;
-    const name = year + "|" + term;
-    const group = groups[name] || (groups[name] = { year, term, ids: [], keys: [] });
-    if (group.ids.indexOf(id) === -1) group.ids.push(id);
-    if (group.keys.indexOf(key) === -1) group.keys.push(key);
+  function loadTermBuildings(scope) {
+    const key = scopeKey(scope);
+    if (!buildingRequests[key]) {
+      buildingRequests[key] = catalog.loadBuildings(scope.year, scope.term)
+        .catch((error) => {
+          delete buildingRequests[key];
+          throw error;
+        });
+    }
+    return buildingRequests[key];
   }
 
-  function ensureMeetings(entries, planned) {
-    const groups = {};
-    entries.forEach(({ row }) =>
-      collect(groups, selectedTerm.year, selectedTerm.term, row.SmObjid, moduleKey(row))
-    );
-    planned.forEach((section) =>
-      collect(groups, selectedTerm.year, selectedTerm.term, section.moduleId, planModuleKey(section))
-    );
-    Object.keys(groups).forEach((name) => {
-      const group = groups[name];
-      group.keys.forEach((key) => (pendingModules[key] = true));
-      Promise.all([
-        catalog.loadMeetings(group.ids, group.year, group.term).catch(() => ({})),
-        catalog.loadFinals(group.ids, group.year, group.term).catch(() => []),
-        catalog.loadBuildings(group.year, group.term).catch(() => ({})),
-      ])
-        .then(([found, finals, halls]) => {
-          Object.keys(found).forEach((key) => (meetingsBySection[key] = found[key]));
-          finals.forEach((final) => {
-            finalsByPackage[catalog.scheduleKey(group.year, group.term, final.moduleId, final.pkgId)] = final;
-          });
-          Object.keys(halls).forEach((key) => (buildings[key] = halls[key]));
-          group.keys.forEach((key) => {
-            delete pendingModules[key];
-            modulesLoaded[key] = true;
-          });
-          apply();
-        });
+  function moduleRequests(entries, planned) {
+    return new Map([
+      ...entries.map(({ row }) => [moduleKey(row), catalog.plainId(row.SmObjid)]),
+      ...planned.map((section) => [planModuleKey(section), catalog.plainId(section.moduleId)]),
+    ]);
+  }
+
+  function needsMeetings(key, background) {
+    return !modulesLoaded[key] && !pendingModules[key] && !(background && failedModulePreloads.has(key));
+  }
+
+  function ensureMeetings(scope, entries, planned, background = false) {
+    const missing = [...moduleRequests(entries, planned)].filter(([key, id]) => id && needsMeetings(key, background));
+    if (!missing.length) return;
+    const { year, term } = scope;
+    const ids = [...new Set(missing.map(([, id]) => id))];
+    missing.forEach(([key]) => (pendingModules[key] = true));
+    Promise.allSettled([
+      catalog.loadMeetings(ids, year, term),
+      catalog.loadFinals(ids, year, term),
+      loadTermBuildings(scope),
+    ]).then(([meetings, finals, halls]) => {
+      if (meetings.status === "fulfilled") Object.assign(meetingsBySection, meetings.value);
+      if (finals.status === "fulfilled") finals.value.forEach((final) => {
+        finalsByPackage[catalog.scheduleKey(year, term, final.moduleId, final.pkgId)] = final;
+      });
+      if (halls.status === "fulfilled") buildingsByTerm[scopeKey(scope)] = halls.value;
+      const failed = [meetings, finals, halls].some((result) => result.status === "rejected");
+      missing.forEach(([key]) => {
+        delete pendingModules[key];
+        if (background && failed) failedModulePreloads.add(key);
+        else modulesLoaded[key] = true;
+      });
+      apply();
     });
+  }
+
+  function cancelPreload() {
+    if (preloadTimer !== null) clearTimeout(preloadTimer);
+    preloadTimer = null;
+  }
+
+  /** Queues calendar data for the next unprepared quarter that has booked or saved courses. */
+  function preloadOtherTerms(entries, options) {
+    if (preloadTimer !== null) return;
+    if (preloading && (preloading.paths.some((path) => pending[path]) ||
+        preloading.moduleKeys.some((key) => pendingModules[key]))) return;
+
+    const selected = scopeKey(selectedTerm);
+    const sections = plans.list().flatMap((plan) => plan.sections);
+    for (const scope of options) {
+      const key = scopeKey(scope);
+      if (key === selected) continue;
+      const booked = entries.filter(({ row }) => terms.key(row.AcademicYear, row.AcademicSession) === key);
+      const planned = sections.filter((section) => scopeKey(section) === key);
+      const paths = booked.filter(({ path }) => needsEvents(path, true)).map(({ path }) => path);
+      const moduleKeys = [...moduleRequests(booked, planned)]
+        .filter(([key, id]) => id && needsMeetings(key, true)).map(([key]) => key);
+      if (!paths.length && !moduleKeys.length) continue;
+
+      preloadTimer = setTimeout(() => {
+        preloadTimer = null;
+        if (!isCoursesRoute() || scopeKey(selectedTerm) !== selected) return;
+        preloading = { paths, moduleKeys };
+        ensureEvents(booked, true);
+        ensureMeetings(scope, booked, planned, true);
+      }, 0);
+      return;
+    }
   }
 
   function meetingsFor(row, event) {
@@ -295,7 +349,7 @@
   }
 
   function roomLabels(text) {
-    const parts = catalog.roomParts(text, buildings);
+    const parts = catalog.roomParts(text, buildingsByTerm[scopeKey(selectedTerm)]);
     if (!parts) return null;
     if (!parts.number) return { short: parts.code, full: parts.code };
     return { short: parts.code + " " + parts.number, full: parts.code + " - " + parts.number };
@@ -493,11 +547,10 @@
     return sorted;
   }
 
-  /** Returns the hour bounds for the calendar, including 8 AM and any earlier meetings. */
+  /** Returns hour bounds covering 8 AM to 9 PM and any events outside that range. */
   function timeRange(items) {
-    if (!items.length) return { startMin: 8 * 60, endMin: 17 * 60 };
     const startMin = Math.min(8 * 60, ...items.map((item) => item.startMin));
-    const endMin = Math.max(...items.map((item) => item.endMin));
+    const endMin = Math.max(21 * 60, ...items.map((item) => item.endMin));
     return { startMin: Math.floor(startMin / 60) * 60, endMin: Math.ceil(endMin / 60) * 60 };
   }
 
@@ -1168,6 +1221,7 @@
   function setTerm(scope) {
     if (scopeKey(scope) === scopeKey(selectedTerm) && scope?.term === selectedTerm?.term) return;
     selectedTerm = scope;
+    cancelPreload();
     publishItems(null);
     window.dispatchEvent(new CustomEvent(TERM_EVENT));
   }
@@ -1513,7 +1567,10 @@
 
     loadTermData();
     const entries = moduleEntries(list);
-    if (!entries) return void publishItems(null);
+    if (!entries) {
+      cancelPreload();
+      return void publishItems(null);
+    }
 
     if (!termData) return;
     const now = Date.now();
@@ -1525,7 +1582,7 @@
     const scoped = termKey ? entries.filter(({ row }) => terms.key(row.AcademicYear, row.AcademicSession) === termKey) : [];
     const planned = planSections();
     ensureEvents(scoped);
-    ensureMeetings(scoped, planned);
+    ensureMeetings(selectedTerm, scoped, planned);
     const total = scoped.length + planned.length;
     const loaded =
       scoped.filter(({ path, row }) => eventsByPath[path] && modulesLoaded[moduleKey(row)]).length +
@@ -1542,6 +1599,7 @@
       return;
     }
     if (loaded < total) {
+      cancelPreload();
       setNativeListHidden(list, true);
       publishItems(null);
       const signature = JSON.stringify(["loading", mode, termKey, availableTerms.map(scopeKey), plans.signature()]);
@@ -1570,6 +1628,7 @@
       rendered = signature;
     }
     coursesPage.mountAfterList(page, list, root, FINDER_ID);
+    preloadOtherTerms(entries, availableTerms);
   }
 
   window.__tssregShared.schedule = {
