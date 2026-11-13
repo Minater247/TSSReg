@@ -293,7 +293,7 @@
 
   function buildMorePanel(groups) {
     const grid = new modules.CSSGrid({
-      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+      gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))",
       gridGap: "18px",
     });
     groups.forEach((group) => grid.addItem(moreColumn(group)));

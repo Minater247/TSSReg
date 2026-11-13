@@ -22,7 +22,7 @@
 
 .sapUshellEasyScanLayoutInner {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   column-gap: 1rem;
   row-gap: 2px;
   align-items: start;
@@ -32,6 +32,7 @@
   position: static !important;
   transform: none !important;
   width: auto !important;
+  min-width: 0 !important;
   height: auto !important;
   transition: none !important;
   overflow: visible !important;
@@ -265,7 +266,7 @@
 
 .tssreg-top-band .sapMScrollContScroll {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   align-content: center;
   column-gap: 1rem;
@@ -310,15 +311,10 @@
     flex: 1 1 100%;
   }
 
-  .tssreg-top-band .sapUiHLayout > .sapUiHLayoutChildWrapper:first-child {
-    align-self: stretch !important;
-  }
-
   .tssreg-top-band .sapFAvatar,
   .tssreg-top-band .sapFAvatar .sapFAvatarImageHolder {
-    width: auto !important;
-    height: calc(100% - 0.5rem) !important;
-    aspect-ratio: 1 / 1 !important;
+    width: 48px !important;
+    height: 48px !important;
   }
 }
 
@@ -341,7 +337,7 @@
 
 .tssreg-quicklinks-host {
   flex: 1 1 286px;
-  min-width: 286px;
+  min-width: min(286px, 100%);
   container-type: inline-size;
   padding: 8px;
   box-sizing: border-box;
@@ -412,17 +408,38 @@
 
 #tssreg-week-strip .tssreg-week-nav-title {
   flex: 1 1 auto;
+  min-width: 0;
   text-align: center;
 }
 
 #tssreg-week-strip .tssreg-week-nav-title .sapMTitle {
   font-size: 1.0625rem;
   font-weight: 600;
+  white-space: normal;
 }
 
 #tssreg-week-strip .tssreg-week-scroll {
   overflow-x: auto;
   position: relative;
+}
+
+@media (max-width: 36rem) {
+  .tssreg-notice {
+    gap: 8px 12px;
+    padding: 12px;
+  }
+
+  .tssreg-notice-text {
+    flex-basis: 9rem;
+  }
+
+  .tssreg-notice-metarow {
+    gap: 4px 12px;
+  }
+
+  #tssreg-week-strip .tssreg-week-nav {
+    gap: .25rem;
+  }
 }
 
 #tssreg-week-strip .tssreg-week-day {
