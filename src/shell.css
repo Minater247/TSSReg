@@ -1,3 +1,162 @@
 #shell-header-icon {
   transform: translateY(5.5%);
 }
+
+#tssreg-shell-navigation {
+  --nav-bg: var(--sapGroup_ContentBackground, #fff);
+  --nav-border: var(--sapList_BorderColor, #d9d9d9);
+  position: fixed;
+  z-index: 1000;
+  inset: var(--tssreg-nav-top) auto auto clamp(.5rem, var(--tssreg-nav-left), calc(100vw - 34rem));
+  box-sizing: border-box;
+  width: 15rem;
+  padding: .35rem;
+  background: var(--nav-bg);
+  border: 1px solid var(--nav-border);
+  border-radius: .5rem;
+  box-shadow: var(--sapContent_Shadow1, 0 4px 18px #0003);
+}
+
+#tssreg-shell-navigation a,
+#tssreg-shell-navigation summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: .25rem .75rem;
+  border-radius: .25rem;
+  box-sizing: border-box;
+  color: var(--sapTextColor, #131e29);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#tssreg-shell-navigation summary::-webkit-details-marker {
+  display: none;
+}
+
+#tssreg-shell-navigation summary {
+  justify-content: space-between;
+  gap: .5rem;
+  list-style: none;
+}
+
+#tssreg-shell-navigation summary::after {
+  content: "";
+  width: .4rem;
+  height: .4rem;
+  border: solid currentColor;
+  border-width: 0 1px 1px 0;
+  transform: rotate(-45deg);
+  flex: none;
+}
+
+#tssreg-shell-navigation a:hover,
+#tssreg-shell-navigation summary:hover,
+#tssreg-shell-navigation details[open] > summary {
+  background: var(--sapList_Hover_Background, #f0f5fa);
+}
+
+#tssreg-shell-navigation .tssreg-nav-links {
+  position: absolute;
+  top: -1px;
+  left: calc(100% - 1px);
+  width: 18rem;
+  box-sizing: border-box;
+  max-height: calc(100dvh - var(--tssreg-nav-top) - .5rem);
+  overflow: auto;
+  padding: .35rem;
+  background: var(--nav-bg);
+  border: 1px solid var(--nav-border);
+  border-radius: .5rem;
+  box-shadow: var(--sapContent_Shadow1, 0 4px 18px #0003);
+}
+
+.sapUxAPObjectPageLayout:has(.tssreg-section-navigation) .sapFDynamicPageHeader {
+  box-shadow: none;
+}
+
+/* Keep the fixed title the same height as SAP switches to its snapped state. */
+.sapUxAPObjectPageLayout:has(.tssreg-section-navigation) .sapFDynamicPageTitle .sapMTitleStyleAuto {
+  font-size: 1.5rem !important;
+}
+
+.tssreg-section-navigation {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem 1rem;
+  padding: .5rem 1rem;
+  background: var(--sapObjectHeader_Background, var(--sapGroup_ContentBackground, #fff));
+  color: var(--sapTextColor, #131e29);
+}
+
+.tssreg-section-navigation > span {
+  font-weight: 600;
+}
+
+.tssreg-section-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem 1rem;
+}
+
+.tssreg-section-links a {
+  display: inline-block;
+  padding-block: .375rem;
+  color: var(--sapLinkColor, #0054a6);
+  text-decoration: underline;
+}
+
+.tssreg-section-navigation select {
+  display: none;
+  width: 100%;
+  min-height: 2.75rem;
+  padding-inline: .75rem;
+  font: inherit;
+  color: inherit;
+  background: var(--sapField_Background, #fff);
+  border: 1px solid var(--sapField_BorderColor, #89919a);
+  border-radius: .25rem;
+}
+
+@media (max-width: 41.999rem), (hover: none) {
+  #tssreg-shell-navigation {
+    inset-inline: .5rem;
+    width: auto;
+    max-height: calc(100dvh - var(--tssreg-nav-top) - .5rem);
+    overflow: auto;
+  }
+
+  #tssreg-shell-navigation a,
+  #tssreg-shell-navigation summary {
+    min-height: 2.75rem;
+  }
+
+  #tssreg-shell-navigation details[open] > summary::after {
+    transform: rotate(45deg);
+  }
+
+  #tssreg-shell-navigation .tssreg-nav-links {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-inline-start: .75rem;
+    padding: 0 0 0 .25rem;
+    border: 0;
+    border-inline-start: 1px solid var(--nav-border);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .tssreg-section-navigation > span,
+  .tssreg-section-links {
+    display: none;
+  }
+
+  .tssreg-section-navigation select {
+    display: block;
+  }
+}

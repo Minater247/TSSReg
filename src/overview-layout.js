@@ -4,6 +4,8 @@
   const MODEL_NAME = "tssreg";
   const BAND_ID = "tssreg-more-band";
   const PANEL_ID = "tssreg-more-services";
+  const LINKS_SERVICE = "/sap/opu/odata/ited/BC_OVP_DLL_SRV/";
+  const MY_COURSES = { text: "My Courses", url: "#ZUSModule-display?TileType=MYMOD&sap-app-origin-hint=&/MyModules" };
 
   const PRIMARY = [
     "Schedule of Classes",
@@ -81,6 +83,9 @@
   ];
 
   const sources = new Map();
+  const linkSets = ["Link01Set", "Link02Set", "Link03Set"];
+  const shellSources = new Map();
+  let shellRequest;
   let cache = null;
   let renderedMore = null;
   let modules = null;
@@ -124,28 +129,33 @@
     return text;
   }
 
+  function serviceLink(data) {
+    return data?.Url && {
+      text: normalizeText(data.Text), url: data.Url, icon: data.ImageUrl, newWindow: !!data.NewWindow,
+    };
+  }
+
+  function linksByText(links) {
+    const byText = Object.create(null);
+    links.forEach((link) => {
+      if (!byText[link.text]) byText[link.text] = link;
+    });
+    return byText;
+  }
+
   /** Collects available links as TSS finishes loading each card. */
   function harvest() {
     let changed = false;
     LINK_CARDS.forEach((card) => {
       const list = listControl(card);
       if (!boundEntitySet(list)) return;
-      const model = list.getBindingInfo("items").model;
-      const rows = list.getItems().flatMap((item) => {
-        const context = item.getBindingContext(model);
-        const data = context && context.getObject();
-        if (!data || !data.Url) return [];
-        return [{
-          text: normalizeText(data.Text),
-          url: data.Url,
-          icon: data.ImageUrl,
-          newWindow: !!data.NewWindow,
-        }];
-      });
+      const { model, path } = list.getBindingInfo("items");
+      const rows = list.getItems().map((item) => serviceLink(item.getBindingContext(model)?.getObject())).filter(Boolean);
       if (!rows.length) return;
       const signature = JSON.stringify(rows);
       if (sources.get(card)?.signature === signature) return;
       sources.set(card, { rows, signature });
+      shellSources.set(path.slice(1), rows);
       changed = true;
     });
     if (!changed) return !!cache;
@@ -159,16 +169,42 @@
       links.push(link);
     }));
 
-    const byText = {};
-    links.forEach((link) => {
-      if (!byText[link.text]) byText[link.text] = link;
-    });
+    const byText = linksByText(links);
     const primary = PRIMARY.map((text) => byText[text]).filter(Boolean);
 
     cache = { links, byText };
     shared.setOverviewPrimary(primary);
     return true;
   }
+
+  /** Returns the curated student links grouped by task, using the dashboard data when it is available. */
+  function shellGroups() {
+    const byText = linksByText(linkSets.flatMap((set) => shellSources.get(set) || []));
+    return GROUPS.map(({ label, texts }, index) => ({
+      label,
+      items: (index === 0 ? [MY_COURSES] : []).concat(texts.map((text) => byText[text]).filter(Boolean)),
+    })).filter(({ items }) => items.length);
+  }
+
+  function loadShellGroups() {
+    if (shellRequest) return shellRequest;
+    const missing = linkSets.filter((set) => !shellSources.has(set));
+    if (!missing.length) return Promise.resolve(shellGroups());
+
+    // Direct links to other TSS apps can open before the dashboard has fetched its link cards.
+    shellRequest = Promise.allSettled(missing.map(async (set) => {
+      const data = await shared.fetchJson(LINKS_SERVICE + set + "?" + shared.CLIENT);
+      if (Array.isArray(data?.d?.results) && !shellSources.has(set)) {
+        shellSources.set(set, data.d.results.map(serviceLink).filter(Boolean));
+      }
+    })).then(() => {
+      shellRequest = null;
+      return shellGroups();
+    });
+    return shellRequest;
+  }
+
+  shared.overviewNavigation = { shellGroups, loadShellGroups };
 
   function promotedTexts() {
     const promoted = {};
