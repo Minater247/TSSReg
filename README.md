@@ -28,7 +28,7 @@ TSS was poised as a replacement for WebReg, but as we've seen, there have been p
 ## Installation
 
 - [Chrome Web Store](https://chromewebstore.google.com/detail/tssreg/ckfdgbabfoflahhggbpcmbjbgjekoifm)
-- Firefox Add-ons (coming soon)
+- [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/tssreg/)
 
 ## Development
 
