@@ -359,7 +359,7 @@
     const footer = new modules.HBox({ renderType: "Bare" });
     footer.addStyleClass("tssreg-week-foot");
     footer.addItem(buildLegend());
-    footer.addItem(new modules.Link({ text: "View My Courses \u203a", href: MY_COURSES }));
+    footer.addItem(new modules.Link({ text: "Course Planner \u203a", href: MY_COURSES }));
     strip.addItem(footer);
   }
 
