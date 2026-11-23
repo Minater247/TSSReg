@@ -309,7 +309,7 @@
     if (!start || !end) return "";
     const format = (date) =>
       date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-    return format(start) + " – " + format(end);
+    return format(start) + " - " + format(end);
   }
 
   function creditsLabel(row) {
@@ -1253,7 +1253,7 @@
     const plan = plans.current();
     const title = mode === MODE_FINALS ? "Final Exams" : plan && plan.name;
     const quarter = selectedTerm && terms.label(selectedTerm, termData.catalog);
-    return [title, quarter].filter(Boolean).join(" – ");
+    return [title, quarter].filter(Boolean).join(" - ");
   }
 
   function exportModel() {

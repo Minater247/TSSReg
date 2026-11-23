@@ -23,7 +23,7 @@
   function updateCaption() {
     const item = document.getElementById("tssreg-timeofday-item");
     const caption = item ? item.querySelector(".tssreg-time-caption") : null;
-    if (caption) caption.textContent = formatTime(lo) + " – " + formatTime(hi);
+    if (caption) caption.textContent = formatTime(lo) + " - " + formatTime(hi);
   }
 
   function onRangeChange(event) {

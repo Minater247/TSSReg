@@ -85,11 +85,11 @@
   }
 
   function rangeLabel(startMin, endMin) {
-    return clockLabel(startMin) + " – " + clockLabel(endMin);
+    return clockLabel(startMin) + " - " + clockLabel(endMin);
   }
 
   function fullRangeLabel(startMin, endMin) {
-    return meridiemLabel(startMin) + " – " + meridiemLabel(endMin);
+    return meridiemLabel(startMin) + " - " + meridiemLabel(endMin);
   }
 
   function dayListLabel(scheduleDays) {

@@ -81,22 +81,42 @@ function loadCalendar() {
   function Control(settings) {
     Object.assign(this, settings);
     this.items ||= [];
+    this.content ||= [];
+    this.browserEvents = {};
     this.addItem = (item) => this.items.push(item);
+    this.addContent = (item) => this.content.push(item);
+    this.attachBrowserEvent = (name, handler) => { this.browserEvents[name] = handler; };
+    this.getContent = () => this.content;
+    this.getExpanded = () => this.expanded;
+    this.setExpanded = (expanded) => {
+      this.expanded = expanded;
+      this.expand({ getParameter: (name) => name === "expand" && expanded });
+    };
+    this.destroyItems = () => { this.items = []; };
     this.addStyleClass = () => this;
     this.setTooltip = (tooltip) => { this.tooltip = tooltip; };
+    this.setText = (text) => { this.text = text; };
+    this.setEnabled = (enabled) => { this.enabled = enabled; };
+    this.setVisible = (visible) => { this.visible = visible; };
   }
   win.__tssregShared.plans.hasSection = () => false;
   sap.ui.require = (names, ready) => ready(...names.map(() => Control));
   const finderBody = fs.readFileSync(FINDER_SRC, "utf8")
     .replace(/^\(\(\) => \{\r?\n/, "").replace(/\}\)\(\);\s*$/, "");
-  calendar.finderGroup = new Function("window", "sap", "location", finderBody + `
-    return (course, packages, conflictMode) => {
+  calendar.finder = new Function("window", "sap", "location", finderBody + `
+    function group(course, packages, conflictMode) {
       state.year = "2026";
       state.term = "3";
       state.f.conflictMode = conflictMode;
       sectionsByModule[course.moduleId] = packages;
-      return courseGroup(course, schedule.busyIntervals(state.year, state.term));
-    };
+      return coursePanel(course, matchingPackages(course, schedule.busyIntervals(state.year, state.term)));
+    }
+    function mountResults() {
+      ui = { results: new modules.VBox(), resultsContainer: new modules.VBox() };
+      ui.pagination = buildPagination();
+      return ui;
+    }
+    return { group, mountResults, renderResults, resetResultsPage, state, sectionsByModule };
   `)(win, sap, location);
   return { ...calendar, location };
 }
@@ -111,6 +131,11 @@ function check(name, actual, expected) {
   const e = JSON.stringify(expected);
   if (a === e) passed++;
   else failures.push(name + "\n    expected " + e + "\n    actual   " + a);
+}
+
+function expandCourse(panel, expanded = true) {
+  panel.setExpanded(expanded);
+  return panel.content[0];
 }
 
 let nextKey = 0;
@@ -371,25 +396,88 @@ check("an alternate package does not use the enrolled action", cal.enrolledRoute
 check("the same package in another term does not use the enrolled action", cal.enrolledRoute("2026", "2", "9462", "154645"), undefined);
 const bookedBlock = { key: "winter", day: "MO", startMin: 540, endMin: 590, row: untimedBooking };
 cal.publishItems([bookedBlock], [{ row: untimedBooking }]);
-const course = { moduleId: "9462", code: "CSE-123" };
+const course = { moduleId: "9462", code: "LISP-001AX", title: "Analysis of Spanish", credits: "2.5" };
 const packages = ["154645", "154646"].map((pkgId) => ({
-  moduleId: course.moduleId, pkgId,
-  components: [{ meetings: [{ day: "MO", startMin: 540, endMin: 590 }] }],
+  moduleId: course.moduleId, pkgId, label: pkgId === "154645" ? "A01" : "A02",
+  components: [
+    { abbr: "A00", type: "Lecture", meetings: [{ day: "MO", startMin: 540, endMin: 590 }] },
+    { abbr: pkgId === "154645" ? "A01" : "A02", type: "Discussion", meetings: [{ day: "TU", startMin: 600, endMin: 650 }] },
+  ],
 }));
-const hiddenConflicts = cal.finderGroup(course, packages, "hide");
-check("Hide Conflicts keeps the booked package and hides the overlapping alternative", hiddenConflicts.items.length, 3);
-const toolbar = hiddenConflicts.items[1];
-check("the booked package has no conflict warning and shows Drop", toolbar.content.map((item) => item.text).filter(Boolean), ["—", "Plan", "Drop"]);
-toolbar.content.find((item) => item.text === "Drop").press();
+const hiddenConflicts = cal.finder.group(course, packages, "hide");
+const [code, , details] = hiddenConflicts.headerToolbar.content;
+check("the result starts collapsed with separate code and title columns", [hiddenConflicts.expanded, hiddenConflicts.content.length,
+  [code.text, ...details.items.map((item) => item.text)]],
+  [false, 0, ["LISP 1AX", "Analysis of Spanish (2.5 units)"]]);
+hiddenConflicts.headerToolbar.browserEvents.click();
+const sectionTable = hiddenConflicts.content[0];
+check("clicking the course header expands the panel", [hiddenConflicts.expanded, hiddenConflicts.content.length], [true, 1]);
+hiddenConflicts.headerToolbar.browserEvents.click();
+check("clicking the course header again collapses the panel", hiddenConflicts.expanded, false);
+hiddenConflicts.headerToolbar.browserEvents.click();
+check("Hide Conflicts keeps the booked lecture and discussion and hides the overlapping alternative", sectionTable.items.length, 2);
+check("meeting rows share one header and show times separately", [sectionTable.columns[2].header.text,
+  sectionTable.items.map((row) => row.cells.slice(0, 3).map((cell) => cell.text))],
+  ["Days & time", [["A00", "Lecture", "Mon 9:00 AM - 9:50 AM"], ["A01", "Discussion", "Tue 10:00 AM - 10:50 AM"]]]);
+const firstCells = sectionTable.items[0].cells;
+check("the booked group has no conflict warning and shows Plan and Drop once",
+  [firstCells[5].items.map((item) => item.text), firstCells[6].items.map((item) => item.text), sectionTable.items[1].cells.length],
+  [["-"], ["Plan", "Drop"], 5]);
+firstCells[6].items.find((item) => item.text === "Drop").press();
 check("Drop opens the native detail route", cal.location.hash, cal.enrolledRoute("2026", "3", "9462", "154645"));
 cal.location.hash = "";
-const collapsed = cal.finderGroup(course, packages, "collapse");
-check("the unbooked package still shows a conflict in collapse mode", collapsed.items[3].content[1].text, "Conflicts with your schedule");
-const enrollment = cal.finderGroup(course, [packages[1]], "").items[1].content.find((item) => item.text === "Enroll");
+const collapsed = cal.finder.group(course, packages, "collapse");
+const conflictCells = collapsed.content[0].items[2].cells;
+check("the unbooked package still shows a compact conflict row in collapse mode", [conflictCells[0].text, conflictCells[5].items[0].text],
+  ["A02", "Conflicts with your schedule"]);
+conflictCells[6].items[0].press();
+const revealed = cal.finder.group(course, packages, "collapse");
+check("Show anyway keeps the course expanded and shows both meetings of the conflicting group",
+  [revealed.expanded, revealed.content.length, revealed.content[0].items.length], [true, 1, 4]);
+revealed.content[0].items[2].cells[6].items[0].press();
+check("Hide collapses just the conflicting option again", cal.finder.group(course, packages, "collapse").content[0].items.length, 3);
+const enrollment = cal.finder.group(course, [packages[1]], "").content[0].items[0].cells[6].items.find((item) => item.text === "Enroll");
 enrollment.press();
 check("Enroll opens booking for the exact unbooked package", cal.location.hash,
   cal.coursesPage.bookingRoute("2026", "3", "9462", "154646"));
 cal.location.hash = "";
+
+const warningCourse = { moduleId: "9977", code: "CSE-101" };
+function warningOption(seats, { day = "TU", waitlist, statusText } = {}) {
+  return { moduleId: warningCourse.moduleId, seats, waitlist, statusText,
+    components: [{ meetings: [{ day, startMin: 540, endMin: 590 }] }] };
+}
+function warningLabels(options, mode = "collapse") {
+  const panel = cal.finder.group(warningCourse, options, mode);
+  return panel.headerToolbar.content[2].items.slice(1).map(({ text, state }) => [text, state]);
+}
+const fullOption = warningOption("0", { waitlist: "-1" });
+const conflictingOption = warningOption("12", { day: "MO" });
+const almostFullOption = warningOption("3");
+const redFull = ["Full, no waitlist", "Error"];
+const redConflict = ["Conflicts with your schedule", "Error"];
+const longWaitlist = ["Full, long waitlist", "Error"];
+const openWaitlist = ["Full, waitlist available", "Error"];
+check("all full sections with closed waitlists warn on the collapsed course", warningLabels([fullOption]), [redFull]);
+check("all overlapping sections warn on the collapsed course", warningLabels([conflictingOption]), [redConflict]);
+check("a mix of full and overlapping sections shows only Full", warningLabels([fullOption, conflictingOption]), [redFull]);
+check("no waitlist takes priority over conflicts even when an inactive list still has students",
+  warningLabels([warningOption("0", { day: "MO", waitlist: "15", statusText: "Waitlist Inactive" })]), [redFull]);
+check("conflicts take priority over a long waitlist when every section overlaps",
+  warningLabels([warningOption("0", { day: "MO", waitlist: "10" })]), [redConflict]);
+check("the warning follows the Hide Conflicts filter", warningLabels([fullOption, conflictingOption], "hide"), [redFull]);
+check("ten students make an available waitlist long", warningLabels([fullOption, warningOption("0", { waitlist: "10" })]), [longWaitlist]);
+check("a shorter compatible waitlist takes precedence over a long one",
+  warningLabels([warningOption("0", { waitlist: "10" }), warningOption("0", { waitlist: "9" })]), [openWaitlist]);
+check("an empty waitlist is available", warningLabels([warningOption("0", { waitlist: "0" })]), [openWaitlist]);
+check("an explicitly active waitlist is available when the count is missing",
+  warningLabels([warningOption("0", { statusText: "Waitlist Active" })]), [openWaitlist]);
+check("missing waitlist metadata yields an unqualified Full warning", warningLabels([warningOption("0")]), [["Full", "Error"]]);
+check("the course is almost full when its best compatible option has three seats",
+  warningLabels([warningOption("0", { waitlist: "10" }), conflictingOption, almostFullOption]), [["Almost full", "Warning"]]);
+check("four open compatible seats keep the course free of warnings", warningLabels([almostFullOption, warningOption("4")]), []);
+check("missing seat counts keep a compatible course free of warnings", warningLabels([fullOption, warningOption(undefined)]), []);
+
 cal.publishItems([], [{ row: untimedBooking }]);
 cal.publishItems([], [{ row: { ...untimedBooking, SmStatusText: "Booked on Waitlist" } }]);
 check("a status change clears the enrolled action even when the calendar still has no blocks",
@@ -881,6 +969,55 @@ currentPlan = null;
 cal.events.list().slice().forEach((record) => cal.events.remove(record.id));
 check("removing every event clears the calendar of them", cal.eventItems(), []);
 
+async function checkFinderPagination() {
+  const { finder } = loadCalendar();
+  const ui = finder.mountResults();
+  finder.state.searched = true;
+  finder.state.f.conflictMode = "";
+  finder.state.f.avail = "open";
+  finder.state.results = Array.from({ length: 24 }, (_, index) => {
+    const moduleId = String(index + 1);
+    finder.sectionsByModule[moduleId] = [{ moduleId, pkgId: "1", seats: index === 0 ? "0" : "1", components: [] }];
+    return { moduleId, code: "CSE " + moduleId };
+  });
+  const sections = finder.sectionsByModule["12"];
+  sections.push({ ...sections[0], pkgId: "2" });
+  const shownCodes = () => ui.results.items.map((group) => group.headerToolbar.content[0].text);
+  const pagerState = () => [ui.previousPage.enabled, ui.pageRange.text, ui.nextPage.enabled];
+
+  finder.renderResults();
+  check("left and right SAP arrows flank the page range", ui.pagination.content.map((control) => control.icon || control.text),
+    ["sap-icon://navigation-left-arrow", "1-10 of 23 courses", "sap-icon://navigation-right-arrow"]);
+  check("the finder pages courses after section filtering and disables the first page's back button",
+    [ui.pagination.visible, ...pagerState()], [true, false, "1-10 of 23 courses", true]);
+  check("only the first ten matching courses are rendered", shownCodes(),
+    Array.from({ length: 10 }, (_, index) => "CSE " + (index + 2)));
+  ui.nextPage.press();
+  ui.nextPage.press();
+  check("the next button reaches the final partial page and disables itself", [...pagerState(), shownCodes()],
+    [true, "21-23 of 23 courses", false, ["CSE 22", "CSE 23", "CSE 24"]]);
+  ui.previousPage.press();
+  check("previous page opens the preceding courses", [ui.pageRange.text, shownCodes()[0]], ["11-20 of 23 courses", "CSE 12"]);
+  const secondPageCourse = ui.results.items[0];
+  const table = expandCourse(secondPageCourse);
+  check("both sections of a course appear under one table on the same page", [secondPageCourse.content.length, table.items.length], [1, 2]);
+  finder.renderResults();
+  check("refreshing results preserves the current page and expanded course", [finder.state.page, ui.results.items[0].expanded], [2, true]);
+  expandCourse(ui.results.items[0], false);
+  finder.renderResults();
+  check("collapsed courses skip building the section table on refresh", ui.results.items[0].content.length, 0);
+  ui.nextPage.press();
+  finder.state.results = finder.state.results.slice(0, 14);
+  finder.renderResults();
+  check("a shorter result set clamps the current page", pagerState(), [true, "11-13 of 13 courses", false]);
+  finder.resetResultsPage();
+  await Promise.resolve();
+  check("a new search or filter starts from the first page", pagerState(), [false, "1-10 of 13 courses", true]);
+  finder.state.results = finder.state.results.slice(0, 11);
+  finder.renderResults();
+  check("pagination is hidden when the results fit on one page", [ui.pagination.visible, shownCodes().length], [false, 10]);
+}
+
 async function checkPreloading() {
   const calendar = loadCalendar();
   calendar.location.hash = "#ZUSModule-display&/MyModules";
@@ -939,7 +1076,7 @@ async function checkPreloading() {
   check("leaving the calendar cancels a queued preload", requests.length, 2);
 }
 
-checkPreloading().then(() => {
+checkFinderPagination().then(checkPreloading).then(() => {
   console.log(passed + " passed, " + failures.length + " failed");
   failures.forEach((line) => console.log("  FAIL " + line));
   process.exitCode = failures.length ? 1 : 0;

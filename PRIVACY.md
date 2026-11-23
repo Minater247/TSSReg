@@ -4,7 +4,7 @@ Last updated: 13 November 2026
 
 ## Data Collection
 
-TSSReg sends requests only to UC San Diego’s official Triton Student System (TSS) at `https://tss.ucsd.edu`. These requests use your existing TSS session to retrieve information for the extension’s features. The extension sends no data to the developer or to any other service and collects no analytics or telemetry.
+TSSReg sends requests only to UC San Diego's official Triton Student System (TSS) at `https://tss.ucsd.edu`. These requests use your existing TSS session to retrieve information for the extension's features. The extension sends no data to the developer or to any other service and collects no analytics or telemetry.
 
 ## Information Read
 
@@ -20,7 +20,7 @@ TSSReg uses this information in your browser to display calendars, enrollment in
 
 ## Data Stored
 
-TSSReg saves your planned schedules and custom events in your browser’s local storage for `tss.ucsd.edu`. This data stays in your browser. It includes:
+TSSReg saves your planned schedules and custom events in your browser's local storage for `tss.ucsd.edu`. This data stays in your browser. It includes:
 
 - Course codes
 - Course meeting times
@@ -35,7 +35,7 @@ These are deleted when you clear the site's data.
 
 ## Chrome Web Store Limited Use
 
-TSSReg uses student data only to provide its features on TSS. TSSReg’s use of this data adheres to the Chrome Web Store User Data Policy, including its [Limited Use requirements](https://developer.chrome.com/docs/webstore/program-policies/limited-use).
+TSSReg uses student data only to provide its features on TSS. TSSReg's use of this data adheres to the Chrome Web Store User Data Policy, including its [Limited Use requirements](https://developer.chrome.com/docs/webstore/program-policies/limited-use).
 
 ## Contact
 

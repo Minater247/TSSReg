@@ -3,7 +3,7 @@
   const ROUTE = /^#YStudent-myPersonalDetails(?:[?&]|$)/;
   const PAGE = '.sapUxAPObjectPageLayout[id$="--ObjectPageLayout"]';
   const NAV_CLASS = "tssreg-section-navigation";
-  const rendered = new WeakMap();
+  const navigationByLayout = new WeakMap();
 
   function jump(layout, section, nav) {
     const heading = section.getDomRef()?.querySelector(".sapUxAPObjectPageSectionTitle");
@@ -68,12 +68,16 @@
        shortcuts beside it so CSS can keep them in the scroll container. */
     if (layout.getShowAnchorBar()) layout.setShowAnchorBar(false);
     const signature = JSON.stringify(sections.map((section) => [section.getId(), section.getTitle()]));
-    const previous = content.previousElementSibling;
-    if (rendered.get(previous) === signature) return;
-    const nav = buildNavigation(layout, sections);
-    rendered.set(nav, signature);
-    if (rendered.has(previous)) previous.remove();
-    content.before(nav);
+    let entry = navigationByLayout.get(layout);
+    if (!entry || entry.signature !== signature || sections.some((section, i) => section !== entry.sections[i])) {
+      entry = { signature, sections, nav: buildNavigation(layout, sections) };
+      navigationByLayout.set(layout, entry);
+    }
+    
+    page.querySelectorAll("nav." + NAV_CLASS).forEach((nav) => {
+      if (nav !== entry.nav) nav.remove();
+    });
+    if (content.previousElementSibling !== entry.nav) content.before(entry.nav);
   }
 
   shared.onUiUpdated(apply);

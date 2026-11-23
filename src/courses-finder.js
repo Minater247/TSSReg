@@ -10,6 +10,9 @@
     ["SU", "Su", "Sunday"],
   ];
   const TIME_STEP = 30;
+  const PAGE_SIZE = 10;
+  const LOW_SEAT_LIMIT = 3;
+  const LONG_WAITLIST_MIN = 10;
   const LEVELS = [
     ["Lower Division", "Lower Division"],
     ["Upper Division", "Upper Division"],
@@ -34,7 +37,8 @@
 
   const sectionsByModule = {};
   const fetching = {};
-  const expanded = {};
+  const expandedCourses = new Set();
+  const revealedConflicts = new Set();
 
   const state = {
     open: true,
@@ -46,6 +50,7 @@
     busy: false,
     error: "",
     results: [],
+    page: 1,
     year: "",
     term: "",
     years: [],
@@ -84,7 +89,7 @@
       [
         "sap/m/Panel",
         "sap/m/Toolbar",
-        "sap/m/ToolbarSpacer",
+        "sap/m/ToolbarSeparator",
         "sap/m/Text",
         "sap/m/Label",
         "sap/m/VBox",
@@ -108,7 +113,7 @@
       ],
       function () {
         const names = [
-          "Panel", "Toolbar", "ToolbarSpacer", "Text", "Label", "VBox", "HBox", "Button",
+          "Panel", "Toolbar", "ToolbarSeparator", "Text", "Label", "VBox", "HBox", "Button",
           "SearchField", "Input", "Select", "ComboBox", "MultiComboBox", "RangeSlider", "Table", "Column",
           "ColumnListItem", "ObjectStatus", "BusyIndicator", "AlignedFlowLayout", "VerticalLayout", "HTML", "Item",
         ];
@@ -183,7 +188,7 @@
         config.apply(event.getParameter("range"));
         if (readout) readout.setText(config.format());
       },
-      change: refreshResults,
+      change: resetResultsPage,
     });
     const box = fieldWith(label, slider, readout ? [readout] : []);
     box.addStyleClass("tssreg-find-slider");
@@ -251,7 +256,7 @@
     state.busy = true;
     state.error = "";
     state.searched = true;
-    refreshResults();
+    resetResultsPage();
     const token = ++searchToken;
     catalog
       .search(state.f, state.year, state.term)
@@ -293,36 +298,27 @@
     return box;
   }
 
-  function column(caption, tooltip) {
-    const header = new modules.Text({ text: caption });
-    if (tooltip) header.setTooltip(tooltip);
-    return new modules.Column({ header });
-  }
-
-  function componentTable(course, pkg) {
+  function sectionTable(course, packages) {
+    const columns = [
+      ["Section", "5rem", "High"],
+      ["Type", "6rem", "Medium"],
+      ["Days & time", "13rem", "High"],
+      ["Location", "7rem", "Low"],
+      ["Instructor", "9rem", "Low"],
+      ["Seats", "8rem", "Medium"],
+      ["Actions", "10rem", "Medium"],
+    ];
     const table = new modules.Table({
-      showSeparators: "Inner",
-      columns: [
-        column("Section"),
-        column("Type", "Lecture, discussion, lab, etc."),
-        column("Days & time"),
-        column("Location"),
-        column("Instructor"),
-      ],
-      items: pkg.components.map(
-        (component) =>
-          new modules.ColumnListItem({
-            cells: [
-              text(component.abbr || component.sectionId),
-              text(component.type || "—"),
-              text(coursesPage.meetingLabel(component.meetings) || "TBA"),
-              text(component.location || "—"),
-              text(component.instructor || "—"),
-            ],
-          })
+      showSeparators: "All",
+      contextualWidth: "Auto",
+      autoPopinMode: true,
+      popinLayout: "GridSmall",
+      columns: columns.map(([caption, width, importance]) =>
+        new modules.Column({ header: text(caption), width, importance })
       ),
+      items: packages.flatMap((entry, index) => sectionRows(course, entry, index !== 0)),
     });
-    table.addStyleClass("tssreg-find-table");
+    table.addStyleClass("tssreg-find-table sapUiSizeCompact");
     return table;
   }
 
@@ -330,7 +326,7 @@
     const open = parseInt(pkg.seats, 10);
     const capacity = parseInt(pkg.capacity, 10);
     const waiting = parseInt(pkg.waitlist, 10);
-    if (isNaN(open)) return new modules.ObjectStatus({ text: pkg.statusText || "—" });
+    if (isNaN(open)) return new modules.ObjectStatus({ text: pkg.statusText || "-" });
     if (open > 0) {
       return new modules.ObjectStatus({
         text: open + " of " + (isNaN(capacity) ? "?" : capacity) + " open",
@@ -358,73 +354,61 @@
     });
   }
 
-  function packageToolbar(course, pkg, conflicting, dropRoute) {
-    const content = [text(pkg.label, "tssreg-find-pkg-label"), seatsStatus(pkg)];
-    if (conflicting) {
-      content.push(
-        new modules.ObjectStatus({
-          text: "Conflicts",
+  function enrollmentButton(pkg, dropRoute) {
+    return new modules.Button({
+      text: dropRoute ? "Drop" : "Enroll",
+      tooltip: dropRoute ? "Open the TSS detail page to withdraw" : "Open this section in TSS booking",
+      press: () => {
+        location.hash = dropRoute || coursesPage.bookingRoute(state.year, state.term, pkg.moduleId, pkg.pkgId);
+      },
+    });
+  }
+
+  function conflictToggle(key, hidden) {
+    return new modules.Button({
+      text: hidden ? "Show anyway" : "Hide",
+      type: "Transparent",
+      press: () => {
+        if (hidden) revealedConflicts.add(key);
+        else revealedConflicts.delete(key);
+        refreshResults();
+      },
+    });
+  }
+
+  function sectionRows(course, { pkg, dropRoute, conflicting }, separate) {
+    const key = pkg.moduleId + "|" + pkg.pkgId;
+    const collapsible = conflicting && state.f.conflictMode === "collapse";
+    const hidden = collapsible && !revealedConflicts.has(key);
+    const label = pkg.label || pkg.pkgId;
+    const components = hidden || !pkg.components.length ? [{}] : pkg.components;
+
+    return components.map((component, index) => {
+      const details = hidden ? ["", "", "", ""] : [
+        component.type || "-",
+        coursesPage.meetingLabel(component.meetings) || "TBA",
+        component.location || "-",
+        component.instructor || "-",
+      ];
+      const cells = [component.abbr || component.sectionId || label, ...details].map((value) => text(value));
+      if (index === 0) {
+        const statuses = hidden ? [] : [seatsStatus(pkg)];
+        if (conflicting) statuses.push(new modules.ObjectStatus({
+          text: hidden ? "Conflicts with your schedule" : "Conflicts",
           state: "Warning",
           tooltip: "Overlaps something already on your schedule",
-        })
-      );
-      if (state.f.conflictMode === "collapse") {
-        content.push(
-          new modules.Button({
-            text: "Hide",
-            type: "Transparent",
-            press: () => {
-              delete expanded[pkg.moduleId + "|" + pkg.pkgId];
-              refreshResults();
-            },
-          })
+        }));
+        const actions = collapsible ? [conflictToggle(key, hidden)] : [];
+        if (!hidden) actions.push(planButton(course, pkg), enrollmentButton(pkg, dropRoute));
+        cells.push(
+          new modules.VBox({ renderType: "Bare", items: statuses }),
+          new modules.HBox({ renderType: "Bare", wrap: "Wrap", items: actions }).addStyleClass("tssreg-find-section-actions")
         );
       }
-    }
-    content.push(new modules.ToolbarSpacer());
-    content.push(planButton(course, pkg));
-    content.push(
-      new modules.Button({
-        text: dropRoute ? "Drop" : "Enroll",
-        tooltip: dropRoute ? "Open the TSS detail page to withdraw" : "Open this section in TSS booking",
-        press: () => {
-          location.hash = dropRoute || coursesPage.bookingRoute(state.year, state.term, pkg.moduleId, pkg.pkgId);
-        },
-      })
-    );
-    const toolbar = new modules.Toolbar({ content });
-    toolbar.addStyleClass("tssreg-find-pkg-bar");
-    return toolbar;
-  }
-
-  function collapsedPackage(pkg) {
-    const toolbar = new modules.Toolbar({
-      content: [
-        text(pkg.label, "tssreg-find-pkg-label"),
-        new modules.ObjectStatus({ text: "Conflicts with your schedule", state: "Warning" }),
-        new modules.ToolbarSpacer(),
-        new modules.Button({
-          text: "Show anyway",
-          type: "Transparent",
-          press: () => {
-            expanded[pkg.moduleId + "|" + pkg.pkgId] = true;
-            refreshResults();
-          },
-        }),
-      ],
+      const row = new modules.ColumnListItem({ vAlign: "Middle", cells });
+      if (separate && index === 0) row.addStyleClass("tssreg-find-section-start");
+      return row;
     });
-    toolbar.addStyleClass("tssreg-find-pkg-bar");
-    return toolbar;
-  }
-
-  function courseHeader(course) {
-    const meta = [course.credits ? course.credits + " units" : "", course.department].filter(Boolean).join(" | ");
-    const row = new modules.HBox({ renderType: "Bare", alignItems: "Baseline", wrap: "Wrap" });
-    row.addStyleClass("tssreg-find-course-head");
-    row.addItem(text(course.code, "tssreg-find-course-code"));
-    row.addItem(text(course.title, "tssreg-find-course-title"));
-    if (meta) row.addItem(text(meta, "tssreg-find-course-meta"));
-    return row;
   }
 
   function visiblePackages(course) {
@@ -438,57 +422,148 @@
     });
   }
 
-  function courseGroup(course, busy) {
-    const packages = visiblePackages(course).map((pkg) => {
+  function matchingPackages(course, busy) {
+    return visiblePackages(course).map((pkg) => {
       const dropRoute = schedule.enrolledRoute(state.year, state.term, pkg.moduleId, pkg.pkgId);
       return { pkg, dropRoute, conflicting: !dropRoute && catalog.conflicts(pkg, busy) };
     }).filter(({ conflicting }) => state.f.conflictMode !== "hide" || !conflicting);
+  }
+
+  function waitlistStatus(pkg) {
+    const status = (pkg.statusText || "").trim().toLowerCase();
+    const count = parseInt(pkg.waitlist, 10);
+    /* TSS can report students still waiting after the waitlist stops accepting additions. */
+    if (status === "waitlist inactive") return "closed";
+    if (count >= LONG_WAITLIST_MIN) return "long";
+    if (status === "waitlist active" || count >= 0) return "open";
+    return count < 0 ? "closed" : "unknown";
+  }
+
+  function courseWarning(packages) {
     if (!packages.length) return null;
-    const group = new modules.VBox({ renderType: "Bare", items: [courseHeader(course)] });
-    group.addStyleClass("tssreg-find-course");
-    packages.forEach(({ pkg, dropRoute, conflicting }) => {
-      if (conflicting && state.f.conflictMode === "collapse" && !expanded[pkg.moduleId + "|" + pkg.pkgId]) {
-        group.addItem(collapsedPackage(pkg));
-        return;
+    const compatible = packages.filter(({ conflicting }) => !conflicting);
+    /* Check all sections for a full course when every section conflicts. */
+    const options = compatible.length ? compatible : packages;
+    const seats = options.map(({ pkg }) => parseInt(pkg.seats, 10));
+    const full = seats.every((count) => count <= 0);
+    const waitlists = full ? options.map(({ pkg }) => waitlistStatus(pkg)) : [];
+    if (full && waitlists.every((status) => status === "closed")) {
+      return { text: "Full, no waitlist", state: "Error" };
+    }
+    if (!compatible.length) return { text: "Conflicts with your schedule", state: "Error" };
+    if (full) {
+      if (waitlists.every((status) => status === "long" || status === "closed")) {
+        return { text: "Full, long waitlist", state: "Error" };
       }
-      group.addItem(packageToolbar(course, pkg, conflicting, dropRoute));
-      group.addItem(componentTable(course, pkg));
+      if (waitlists.includes("open") || waitlists.includes("long")) {
+        return { text: "Full, waitlist available", state: "Error" };
+      }
+      return { text: "Full", state: "Error" };
+    }
+    /* Packages can share seats, so use the best compatible option's count. */
+    if (seats.every((count) => count <= LOW_SEAT_LIMIT)) return { text: "Almost full", state: "Warning" };
+    return null;
+  }
+
+  function coursePanel(course, packages) {
+    const code = course.code.replace(/^([A-Z]+)[ -]+0*(\d+[A-Z]*)$/i, "$1 $2");
+    const unitLabel = Number(course.credits) === 1 ? " unit" : " units";
+    const units = course.credits && "(" + course.credits + unitLabel + ")";
+    const title = [course.title, units].filter(Boolean).join(" ");
+    const warning = courseWarning(packages);
+    const items = [text(title)];
+    if (warning) items.push(new modules.ObjectStatus(warning));
+    const details = new modules.HBox({
+      renderType: "Bare",
+      alignItems: "Center",
+      wrap: "Wrap",
+      items,
+    }).addStyleClass("tssreg-find-course-details");
+    /* The default panel toolbar applies SAP's bold font to both text labels. */
+    const header = new modules.Toolbar({
+      design: "Solid",
+      height: "auto",
+      content: [
+        text(code, "tssreg-find-course-code"),
+        new modules.ToolbarSeparator(),
+        details,
+      ],
+    }).addStyleClass("tssreg-find-course-head");
+    const expanded = expandedCourses.has(course.moduleId);
+    const panel = new modules.Panel({
+      headerToolbar: header,
+      expandable: true,
+      expanded,
+      expandAnimation: false,
+      content: expanded ? [sectionTable(course, packages)] : [],
+      expand: (event) => {
+        if (event.getParameter("expand")) {
+          expandedCourses.add(course.moduleId);
+          if (!panel.getContent().length) panel.addContent(sectionTable(course, packages));
+        } else {
+          expandedCourses.delete(course.moduleId);
+        }
+      },
     });
-    return group;
+    header.attachBrowserEvent("click", () => panel.setExpanded(!panel.getExpanded()));
+    panel.addStyleClass("sapUiNoContentPadding");
+    panel.addStyleClass("tssreg-find-course");
+    return panel;
   }
 
   function resultsContent() {
-    if (state.error) return [message(state.error, true)];
-    if (state.busy) return [busyBox("Searching…")];
-    if (!state.searched) return [];
-    if (!state.results.length) return [message("No courses match those filters.")];
+    if (state.error) return { items: [message(state.error, true)] };
+    if (state.busy) return { items: [busyBox("Searching...")] };
+    if (!state.searched) return { items: [] };
+    if (!state.results.length) return { items: [message("No courses match those filters.")] };
 
     const pending = state.results.filter((course) => !sectionsByModule[course.moduleId]).length;
     if (pending) {
       const total = state.results.length;
       const loaded = total - pending;
-      return [
-        busyBox(
-          "Loading section times — " + loaded + " of " + total + " course" + (total === 1 ? "" : "s")
-        ),
-      ];
+      return {
+        items: [busyBox(
+          "Loading section times - " + loaded + " of " + total + " course" + (total === 1 ? "" : "s")
+        )],
+      };
     }
 
     const busy = state.f.conflictMode ? schedule.busyIntervals(state.year, state.term) : null;
-    if (state.f.conflictMode && !busy) return [busyBox("Waiting for your enrolled courses…")];
+    if (state.f.conflictMode && !busy) return { items: [busyBox("Waiting for your enrolled courses...")] };
 
-    const groups = state.results
+    const courses = state.results
       .filter((course) => catalog.match.units(course, state.f.unitsMin, state.f.unitsMax, state.credits))
-      .map((course) => courseGroup(course, busy))
-      .filter(Boolean);
-    if (!groups.length) return [message("No sections match those filters.")];
-    return groups;
+      .map((course) => ({ course, packages: matchingPackages(course, busy) }))
+      .filter(({ packages }) => packages.length);
+    const total = courses.length;
+    if (!total) {
+      state.page = 1;
+      return { items: [message("No sections match those filters.")] };
+    }
+    state.page = Math.max(1, Math.min(state.page, Math.ceil(total / PAGE_SIZE)));
+    const start = (state.page - 1) * PAGE_SIZE;
+    const items = courses.slice(start, start + PAGE_SIZE).map(({ course, packages }) => coursePanel(course, packages));
+    return { items, total, start };
   }
 
   function renderResults() {
     if (!ui || !ui.results) return;
+    ui.resultsContainer.setVisible(state.searched);
+    const { items, total = 0, start } = resultsContent();
+    const pages = Math.ceil(total / PAGE_SIZE);
+    ui.pagination.setVisible(pages > 1);
+    if (pages > 1) {
+      ui.pageRange.setText((start + 1) + "-" + (start + items.length) + " of " + total + " courses");
+      ui.previousPage.setEnabled(state.page > 1);
+      ui.nextPage.setEnabled(state.page < pages);
+    }
     ui.results.destroyItems();
-    resultsContent().forEach((item) => ui.results.addItem(item));
+    items.forEach((item) => ui.results.addItem(item));
+  }
+
+  function resetResultsPage() {
+    state.page = 1;
+    refreshResults();
   }
 
   function refreshResults() {
@@ -498,6 +573,32 @@
       refreshPending = false;
       renderResults();
     });
+  }
+
+  function buildPagination() {
+    ui.pageRange = new modules.Text();
+    ui.previousPage = new modules.Button({
+      icon: "sap-icon://navigation-left-arrow",
+      tooltip: "Previous page of courses",
+      type: "Transparent",
+      press: () => {
+        state.page -= 1;
+        renderResults();
+      },
+    });
+    ui.nextPage = new modules.Button({
+      icon: "sap-icon://navigation-right-arrow",
+      tooltip: "Next page of courses",
+      type: "Transparent",
+      press: () => {
+        state.page += 1;
+        renderResults();
+      },
+    });
+    return new modules.Toolbar({
+      visible: false,
+      content: [ui.previousPage, ui.pageRange, ui.nextPage],
+    }).addStyleClass("tssreg-find-pagination");
   }
 
   function basicFields() {
@@ -567,7 +668,7 @@
       captionLabel("Days of the Week", "Sections that meet on every chosen day"),
       pillRow(DAY_PILLS, state.f.days, (key, pressed) => {
         state.f.days[key] = pressed;
-        refreshResults();
+        resetResultsPage();
       })
     );
     const toggle = new modules.Button({
@@ -577,7 +678,7 @@
         const on = state.f.conflictMode !== "hide";
         state.f.conflictMode = on ? "hide" : "collapse";
         toggle.setType(pillType(on));
-        refreshResults();
+        resetResultsPage();
       },
     });
     toggle.addStyleClass("tssreg-find-pill");
@@ -658,7 +759,7 @@
 
     const availability = choiceRow(AVAILABILITY, state.f.avail, (key) => {
       state.f.avail = key;
-      refreshResults();
+      resetResultsPage();
     });
 
     const wishlisted = new modules.Select({
@@ -754,10 +855,12 @@
     state.f.buildings = {};
     state.f.modality = "";
     state.results = [];
+    state.page = 1;
     state.searched = false;
     Object.keys(sectionsByModule).forEach((id) => delete sectionsByModule[id]);
     Object.keys(fetching).forEach((id) => delete fetching[id]);
-    Object.keys(expanded).forEach((id) => delete expanded[id]);
+    expandedCourses.clear();
+    revealedConflicts.clear();
     if (ui && state.open) loadCatalog();
   }
 
@@ -815,12 +918,17 @@
     ui.panel.destroyContent();
     ui.results = null;
     if (state.catalogError) return void ui.panel.addContent(message(state.catalogError, true));
-    if (!state.ready) return void ui.panel.addContent(busyBox("Loading the course catalog…"));
+    if (!state.ready) return void ui.panel.addContent(busyBox("Loading the course catalog..."));
 
+    ui.pagination = buildPagination();
     ui.results = new modules.VBox({ renderType: "Bare" });
-    ui.results.addStyleClass("tssreg-find-results");
     ui.panel.addContent(buildForm());
-    ui.panel.addContent(ui.results);
+    ui.resultsContainer = new modules.VBox({
+      renderType: "Bare",
+      visible: state.searched,
+      items: [ui.pagination, ui.results],
+    }).addStyleClass("tssreg-find-list");
+    ui.panel.addContent(ui.resultsContainer);
     refreshResults();
   }
 

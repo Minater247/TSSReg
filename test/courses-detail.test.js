@@ -66,19 +66,19 @@ check(
 check(
   "the recurring days read in week order on one line",
   detail.scheduleLabel(lecture).split("\n")[0],
-  "Mon/Wed/Fri 4:00 PM – 4:50 PM"
+  "Mon/Wed/Fri 4:00 PM - 4:50 PM"
 );
 check(
   "the final exam is kept, named and dated on its own line",
   detail.scheduleLabel(lecture).split("\n")[1],
-  "Final Examination Tue, Dec 8 3:00 PM – 5:59 PM"
+  "Final Examination Tue, Dec 8 3:00 PM - 5:59 PM"
 );
 check("a lecture yields exactly two lines", detail.scheduleLabel(lecture).split("\n").length, 2);
 
 // ---------- single-day sections ----------
 const lab = { results: [] };
 for (let i = 0; i < 10; i++) lab.results.push(occurrence(4, "Thursday", 600, 770));
-check("a single-day section reads as one line", detail.scheduleLabel(lab), "Thu 10:00 AM – 12:50 PM");
+check("a single-day section reads as one line", detail.scheduleLabel(lab), "Thu 10:00 AM - 12:50 PM");
 check("a single-day section has no special sessions", detail.specialSessions(lab.results), []);
 
 // ---------- unusable input ----------

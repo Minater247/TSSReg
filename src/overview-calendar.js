@@ -71,9 +71,9 @@
 
   function formatRange(start, end) {
     if (meridiem(start) === meridiem(end)) {
-      return clockTime(start) + " – " + clockTime(end) + " " + meridiem(end);
+      return clockTime(start) + " - " + clockTime(end) + " " + meridiem(end);
     }
-    return clockTime(start) + " " + meridiem(start) + " – " + clockTime(end) + " " + meridiem(end);
+    return clockTime(start) + " " + meridiem(start) + " - " + clockTime(end) + " " + meridiem(end);
   }
 
   function dayKey(year, month, date) {
@@ -218,7 +218,7 @@
   function rangeLabel(days) {
     return (
       days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-      " – " +
+      " - " +
       days[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     );
   }
@@ -352,7 +352,7 @@
     scroll.addStyleClass("tssreg-week-scroll");
     if (!dataReady()) {
       scroll.addStyleClass("tssreg-week-loading");
-      scroll.addItem(labelled("Loading…", "tssreg-week-loading-label", "Center"));
+      scroll.addItem(labelled("Loading...", "tssreg-week-loading-label", "Center"));
     }
     strip.addItem(scroll);
 

@@ -122,7 +122,7 @@
 
   function normalizeText(value) {
     const text = String(value || "")
-      .replace(/[​-‍⁠﻿]/g, "")
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
       .trim();
     if (text === "My Academic History") return "Academic History";
     if (text === "TGPT-Class Planner") return "Class Planner";

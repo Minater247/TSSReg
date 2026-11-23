@@ -119,7 +119,7 @@
         text: "Your " + enrollmentLabel(open.timelimit_Text) + " is open",
         meta,
         gauge: {
-          value: countdownTo(open.endTimestamp) || "—",
+          value: countdownTo(open.endTimestamp) || "-",
           fraction: remainingFraction(open.beginTimestamp, open.endTimestamp),
           href: APPT_TIMES,
           title: "Closes " + formatInstant(open.endTimestamp),
@@ -145,7 +145,7 @@
         text: "Your " + enrollmentLabel(pass.timelimit_Text) + " hasn't opened yet",
         meta,
         gauge: {
-          value: countdownTo(pass.beginTimestamp) || "—",
+          value: countdownTo(pass.beginTimestamp) || "-",
           fraction: null,
           href: APPT_TIMES,
           title: "Opens " + formatInstant(pass.beginTimestamp),

@@ -39,8 +39,8 @@ check("minutes keep two digits", page.clockLabel(545), "9:05");
 check("morning carries AM", page.meridiemLabel(545), "9:05 AM");
 check("noon carries PM", page.meridiemLabel(720), "12:00 PM");
 check("the last minute before noon is AM", page.meridiemLabel(719), "11:59 AM");
-check("a bare range drops the meridiem", page.rangeLabel(540, 590), "9:00 – 9:50");
-check("a full range carries both", page.fullRangeLabel(540, 770), "9:00 AM – 12:50 PM");
+check("a bare range drops the meridiem", page.rangeLabel(540, 590), "9:00 - 9:50");
+check("a full range carries both", page.fullRangeLabel(540, 770), "9:00 AM - 12:50 PM");
 
 // ---------- day lists ----------
 check("day codes become names", page.dayListLabel("MO/WE/FR"), "Mon/Wed/Fri");
@@ -52,17 +52,17 @@ check("a missing day string stays empty", page.dayListLabel(null), "");
 check(
   "days that share a time collapse onto one line",
   page.meetingLabel([meeting("WE", 600, 650), meeting("MO", 600, 650), meeting("FR", 600, 650)]),
-  "Mon/Wed/Fri 10:00 AM – 10:50 AM"
+  "Mon/Wed/Fri 10:00 AM - 10:50 AM"
 );
 check(
   "days are ordered by the week, not by arrival",
   page.meetingLabel([meeting("TH", 540, 590), meeting("TU", 540, 590)]),
-  "Tue/Thu 9:00 AM – 9:50 AM"
+  "Tue/Thu 9:00 AM - 9:50 AM"
 );
 check(
   "different times get their own line, earliest first",
   page.meetingLabel([meeting("FR", 900, 950), meeting("MO", 600, 650)]),
-  "Mon 10:00 AM – 10:50 AM\nFri 3:00 PM – 3:50 PM"
+  "Mon 10:00 AM - 10:50 AM\nFri 3:00 PM - 3:50 PM"
 );
 check("no meetings means no label", page.meetingLabel([]), "");
 check("a missing meetings list means no label", page.meetingLabel(undefined), "");

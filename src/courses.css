@@ -304,7 +304,6 @@
 }
 
 .sapMPanel.tssreg-find {
-  --tssreg-find-border: #e5e5e5;
   --tssreg-find-muted: #556b82;
   box-sizing: border-box;
   width: 100%;
@@ -381,45 +380,98 @@
   color: #bb0000 !important;
 }
 
-.tssreg-find .tssreg-find-results {
-  gap: 18px;
+.tssreg-find .tssreg-find-list {
+  border: 1px solid var(--sapGroup_ContentBorderColor, var(--sapList_BorderColor, #c1cad3));
+  border-radius: 0.25rem;
+  padding: 0.5rem;
 }
 
-.tssreg-find .tssreg-find-course {
-  border: 1px solid var(--tssreg-find-border);
-  border-radius: 4px;
-  overflow: hidden;
+.tssreg-find .tssreg-find-pagination.sapMTB {
+  height: auto;
+  min-height: 3rem;
+  padding-block-end: 0.5rem;
+  margin-block-end: 0.5rem;
+  border-bottom: 1px solid var(--sapGroup_ContentBorderColor, var(--sapList_BorderColor, #c1cad3));
 }
 
-.tssreg-find .tssreg-find-course-head {
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--tssreg-find-border);
+.tssreg-find .tssreg-find-course.sapMPanel {
+  box-sizing: border-box;
+  min-height: 0;
+  border: 1px solid var(--sapGroup_ContentBorderColor, var(--sapList_BorderColor, #c1cad3));
+  border-radius: 0.25rem;
+  margin-block-end: 0.5rem;
+}
+
+.tssreg-find .tssreg-find-course > .sapMPanelHeadingDiv > .sapMPanelWrappingDivTb {
+  border-bottom: 0;
+  border-radius: 0;
+}
+
+.tssreg-find .tssreg-find-course > .sapMPanelHeadingDiv > .sapMPanelWrappingDivTbExpanded {
+  border-bottom: 1px solid var(--sapGroup_ContentBorderColor, var(--sapList_BorderColor, #c1cad3));
+}
+
+.tssreg-find .tssreg-find-course.sapMPanel .sapMPanelWrappingDivTb > .tssreg-find-course-head.sapMTB {
+  border-radius: 0;
+}
+
+.tssreg-find .tssreg-find-course-head.sapMTB {
+  cursor: pointer;
+  min-height: 3rem;
+}
+
+.sapUiSizeCompact .tssreg-find .tssreg-find-course-head.sapMTB {
+  min-height: 2rem;
+}
+
+.tssreg-find .tssreg-find-course-head .sapMText {
+  cursor: inherit;
 }
 
 .tssreg-find .tssreg-find-course-code.sapMText {
   font-weight: 700;
-  flex: 0 0 auto;
+  flex: 0 0 6rem;
 }
 
-.tssreg-find .tssreg-find-course-title.sapMText {
+.tssreg-find .tssreg-find-course-head.sapMTB > .tssreg-find-course-details {
   flex: 1 1 auto;
+  min-width: 0;
+  gap: 0.25rem 1.25rem;
+  padding-block: 0.25rem;
+  white-space: normal;
 }
 
-.tssreg-find .tssreg-find-course-meta.sapMText {
-  font-size: 0.8125rem !important;
-  color: var(--tssreg-find-muted) !important;
-  flex: 0 0 auto;
+.tssreg-find .tssreg-find-course-details > :is(.sapMText, .sapMObjStatus) {
+  max-width: 100%;
 }
 
-.tssreg-find .tssreg-find-pkg-bar.sapMTB {
-  background: transparent;
-  border-bottom: 1px solid var(--tssreg-find-border);
+.tssreg-find-table {
+  --tssreg-table-rule: var(--sapList_BorderColor, #c1cad3);
 }
 
-.tssreg-find .tssreg-find-pkg-label.sapMText {
-  font-weight: 600;
-  flex: 0 0 auto;
+.tssreg-find-table :is(.sapMListTblHeader, .sapMListTblRow) > .sapMListTblCell:not(.sapMTblLastVisibleCell) {
+  border-inline-end: 1px solid var(--tssreg-table-rule);
+}
+
+.tssreg-find-table .sapMListTblRow > .sapMListTblCell {
+  padding: 0.125rem 0.375rem;
+  border-top-color: var(--tssreg-table-rule);
+}
+
+.tssreg-find-table .sapMListTblRow.tssreg-find-section-start > .sapMListTblCell {
+  border-top: 2px solid var(--sapList_HeaderBorderColor, #a8b3bd);
+}
+
+.tssreg-find-table .sapMListTblHeader .sapMColumnHeader {
+  padding: 0.375rem;
+}
+
+.tssreg-find-table .sapMListTblSubCnt {
+  padding-inline: 0.375rem;
+}
+
+.tssreg-find .tssreg-find-section-actions {
+  column-gap: 0.25rem;
 }
 
 .tssreg-find .tssreg-find-table .sapMListTblHeader,

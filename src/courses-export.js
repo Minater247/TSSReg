@@ -41,8 +41,8 @@
     if (!value || maxWidth <= 0) return "";
     if (ctx.measureText(value).width <= maxWidth) return value;
     let cut = value;
-    while (cut.length > 1 && ctx.measureText(cut + "…").width > maxWidth) cut = cut.slice(0, -1);
-    return cut + "…";
+    while (cut.length > 1 && ctx.measureText(cut + "...").width > maxWidth) cut = cut.slice(0, -1);
+    return cut + "...";
   }
 
   function blockHeight(item) {
